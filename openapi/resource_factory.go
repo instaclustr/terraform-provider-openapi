@@ -154,7 +154,7 @@ func (r resourceFactory) readWithOptions(data *schema.ResourceData, i interface{
 	if err != nil {
 		if openapiErr, ok := err.(openapierr.Error); ok {
 			if openapierr.NotFound == openapiErr.Code() && !handleNotFoundErr {
-				return nil
+				return updateStateWithPayloadData(r.openAPIResource, map[string]interface{}{}, data)
 			}
 		}
 		return fmt.Errorf("[resource='%s'] GET %s/%s failed: %s", r.openAPIResource.GetResourceName(), resourcePath, data.Id(), err)
@@ -165,7 +165,7 @@ func (r resourceFactory) readWithOptions(data *schema.ResourceData, i interface{
 
 func (r resourceFactory) read(data *schema.ResourceData, i interface{}) error {
 	log.Printf("[resource_factory read - longlonglonglong] ")
-	return r.readWithOptions(data, i, true)
+	return r.readWithOptions(data, i, false)
 }
 
 func (r resourceFactory) readRemote(id string, providerClient ClientOpenAPI, parentIDs ...string) (map[string]interface{}, error) {
