@@ -41,6 +41,8 @@ func newResourceFactory(openAPIResource SpecResource) resourceFactory {
 }
 
 func (r resourceFactory) createTerraformResource() (*schema.Resource, error) {
+	log.Printf("[resource_factory createTerraformResource - longlonglonglong]")
+
 	s, err := r.createTerraformResourceSchema()
 	if err != nil {
 		return nil, err
@@ -131,7 +133,7 @@ func (r resourceFactory) create(data *schema.ResourceData, i interface{}) error 
 }
 
 func (r resourceFactory) readWithOptions(data *schema.ResourceData, i interface{}, handleNotFoundErr bool) error {
-	log.Printf("[resource_factory readWithOptions - longlonglonglong] data %s", data)
+	log.Printf("[resource_factory readWithOptions - longlonglonglong] handleNotFoundErr %t -- data %s", handleNotFoundErr, data.State())
 
 	openAPIClient := i.(ClientOpenAPI)
 
@@ -162,7 +164,8 @@ func (r resourceFactory) readWithOptions(data *schema.ResourceData, i interface{
 }
 
 func (r resourceFactory) read(data *schema.ResourceData, i interface{}) error {
-	return r.readWithOptions(data, i, false)
+	log.Printf("[resource_factory read - longlonglonglong] ")
+	return r.readWithOptions(data, i, true)
 }
 
 func (r resourceFactory) readRemote(id string, providerClient ClientOpenAPI, parentIDs ...string) (map[string]interface{}, error) {
