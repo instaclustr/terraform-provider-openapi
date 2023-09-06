@@ -104,6 +104,7 @@ func getParentIDs(openAPIResource SpecResource, data *schema.ResourceData) ([]st
 // same order as the input (if the list property has the IgnoreItemsOrder set to true). The property names are converted into compliant terraform names if needed.
 // The property names are converted into compliant terraform names if needed.
 func updateStateWithPayloadData(openAPIResource SpecResource, remoteData map[string]interface{}, resourceLocalData *schema.ResourceData) error {
+	log.Printf("[updateStateWithPayloadData - longlonglonglong] remote %s  local %s", sPrettyPrint(remoteData), sPrettyPrint(resourceLocalData))
 	return updateStateWithPayloadDataAndOptions(openAPIResource, remoteData, resourceLocalData, true)
 }
 
@@ -117,6 +118,7 @@ func dataSourceUpdateStateWithPayloadData(openAPIResource SpecResource, remoteDa
 // it will go ahead and compare the items in the list (input vs remote) for properties of type list and the flag 'IgnoreItemsOrder' set to true
 // The property names are converted into compliant terraform names if needed.
 func updateStateWithPayloadDataAndOptions(openAPIResource SpecResource, remoteData map[string]interface{}, resourceLocalData *schema.ResourceData, ignoreListOrderEnabled bool) error {
+	log.Printf("[updateStateWithPayloadDataAndOptions - longlonglonglong] ")
 	resourceSchema, err := openAPIResource.GetResourceSchema()
 	if err != nil {
 		return err
@@ -154,6 +156,7 @@ func updateStateWithPayloadDataAndOptions(openAPIResource SpecResource, remoteDa
 			return err
 		}
 		if value != nil {
+			log.Printf("[updateStateWithPayloadDataAndOptions - longlonglonglong] value %s  resourceLocalData %s", sPrettyPrint(value), sPrettyPrint(resourceLocalData))
 			if err := setResourceDataProperty(*property, value, resourceLocalData); err != nil {
 				return err
 			}

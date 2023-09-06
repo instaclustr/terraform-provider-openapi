@@ -201,6 +201,8 @@ func (r resourceFactory) getParentIDs(data *schema.ResourceData) ([]string, erro
 }
 
 func (r resourceFactory) update(data *schema.ResourceData, i interface{}) error {
+	log.Printf("[resource_factory update - longlonglonglong] data %s", sPrettyPrint(data))
+
 	providerClient := i.(ClientOpenAPI)
 
 	if r.openAPIResource == nil {
