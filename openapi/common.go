@@ -104,7 +104,7 @@ func getParentIDs(openAPIResource SpecResource, data *schema.ResourceData) ([]st
 // same order as the input (if the list property has the IgnoreItemsOrder set to true). The property names are converted into compliant terraform names if needed.
 // The property names are converted into compliant terraform names if needed.
 func updateStateWithPayloadData(openAPIResource SpecResource, remoteData map[string]interface{}, resourceLocalData *schema.ResourceData) error {
-	log.Printf("[updateStateWithPayloadData - longlonglonglong] remote %s  local %s", sPrettyPrint(remoteData), sPrettyPrint(resourceLocalData))
+	log.Printf("[updateStateWithPayloadData - longlonglonglong] remote %s  local %s", sPrettyPrint(remoteData), resourceLocalData)
 	return updateStateWithPayloadDataAndOptions(openAPIResource, remoteData, resourceLocalData, true)
 }
 
@@ -156,7 +156,7 @@ func updateStateWithPayloadDataAndOptions(openAPIResource SpecResource, remoteDa
 			return err
 		}
 		if value != nil {
-			log.Printf("[updateStateWithPayloadDataAndOptions - longlonglonglong] value %s  resourceLocalData %s", sPrettyPrint(value), sPrettyPrint(resourceLocalData))
+			log.Printf("[updateStateWithPayloadDataAndOptions - longlonglonglong] value %s  resourceLocalData %s", sPrettyPrint(value), resourceLocalData)
 			if err := setResourceDataProperty(*property, value, resourceLocalData); err != nil {
 				return err
 			}

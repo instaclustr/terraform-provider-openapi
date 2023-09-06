@@ -88,6 +88,8 @@ func (r resourceFactory) createTerraformResourceSchema() (map[string]*schema.Sch
 }
 
 func (r resourceFactory) create(data *schema.ResourceData, i interface{}) error {
+	log.Printf("[resource_factory create - longlonglonglong] data %s", data)
+
 	providerClient := i.(ClientOpenAPI)
 
 	if r.openAPIResource == nil {
@@ -129,6 +131,8 @@ func (r resourceFactory) create(data *schema.ResourceData, i interface{}) error 
 }
 
 func (r resourceFactory) readWithOptions(data *schema.ResourceData, i interface{}, handleNotFoundErr bool) error {
+	log.Printf("[resource_factory readWithOptions - longlonglonglong] data %s", data)
+
 	openAPIClient := i.(ClientOpenAPI)
 
 	if r.openAPIResource == nil {
@@ -201,7 +205,7 @@ func (r resourceFactory) getParentIDs(data *schema.ResourceData) ([]string, erro
 }
 
 func (r resourceFactory) update(data *schema.ResourceData, i interface{}) error {
-	log.Printf("[resource_factory update - longlonglonglong] data %s", sPrettyPrint(data))
+	log.Printf("[resource_factory update - longlonglonglong] data %s", data)
 
 	providerClient := i.(ClientOpenAPI)
 
@@ -426,6 +430,8 @@ func (r resourceFactory) resourceStateRefreshFunc(resourceLocalData *schema.Reso
 }
 
 func (r resourceFactory) checkImmutableFields(updatedResourceLocalData *schema.ResourceData, openAPIClient ClientOpenAPI, parentIDs ...string) error {
+	log.Printf("[resource_factory checkImmutableFields - longlonglonglong] data %s", updatedResourceLocalData)
+
 	remoteData, err := r.readRemote(updatedResourceLocalData.Id(), openAPIClient, parentIDs...)
 	if err != nil {
 		return err
