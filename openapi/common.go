@@ -156,12 +156,13 @@ func updateStateWithPayloadDataAndOptions(openAPIResource SpecResource, remoteDa
 			return err
 		}
 		if value != nil {
-			log.Printf("[updateStateWithPayloadDataAndOptions - longlonglonglong] value %s  resourceLocalData %s", sPrettyPrint(value), resourceLocalData)
+			log.Printf("[updateStateWithPayloadDataAndOptions - longlonglonglong] property %s - value %s - resourceLocalData %s", property.Name, sPrettyPrint(value), resourceLocalData.State())
 			if err := setResourceDataProperty(*property, value, resourceLocalData); err != nil {
 				return err
 			}
 		}
 	}
+	log.Printf("[updateStateWithPayloadDataAndOptions final updated- longlonglonglong] resourceLocalData %s  ---- raw %s", resourceLocalData.State(), resourceLocalData)
 	return nil
 }
 
