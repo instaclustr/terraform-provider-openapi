@@ -269,6 +269,8 @@ func (r resourceFactory) update(data *schema.ResourceData, i interface{}) error 
 }
 
 func (r resourceFactory) delete(data *schema.ResourceData, i interface{}) error {
+	log.Printf("[resource_factory delete start - longlonglonglong] data %s", data)
+
 	providerClient := i.(ClientOpenAPI)
 
 	if r.openAPIResource == nil {
@@ -299,11 +301,14 @@ func (r resourceFactory) delete(data *schema.ResourceData, i interface{}) error 
 		}
 		return fmt.Errorf("[resource='%s'] DELETE %s/%s failed: %s", r.openAPIResource.GetResourceName(), resourcePath, data.Id(), err)
 	}
+	log.Printf("[resource_factory delete 11111 - longlonglonglong] data %s", data)
 
 	err = r.handlePollingIfConfigured(nil, data, providerClient, operation, res.StatusCode, schema.TimeoutDelete)
 	if err != nil {
 		return fmt.Errorf("polling mechanism failed after DELETE %s call with response status code (%d): %s", resourcePath, res.StatusCode, err)
 	}
+
+	log.Printf("[resource_factory delete end - longlonglonglong] data %s", data)
 
 	return nil
 }
