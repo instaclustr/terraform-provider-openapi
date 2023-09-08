@@ -90,7 +90,7 @@ func (r resourceFactory) createTerraformResourceSchema() (map[string]*schema.Sch
 }
 
 func (r resourceFactory) create(data *schema.ResourceData, i interface{}) error {
-	log.Printf("[resource_factory create - longlonglonglong] data %s", data)
+	log.Printf("[resource_factory create start - longlonglonglong] state %s -- data %s", data.State(), data)
 
 	providerClient := i.(ClientOpenAPI)
 
@@ -128,6 +128,8 @@ func (r resourceFactory) create(data *schema.ResourceData, i interface{}) error 
 	if err != nil {
 		return fmt.Errorf("polling mechanism failed after POST %s call with response status code (%d): %s", resourcePath, res.StatusCode, err)
 	}
+
+	log.Printf("[resource_factory create end - longlonglonglong] state %s -- data %s", data.State(), data)
 
 	return updateStateWithPayloadData(r.openAPIResource, responsePayload, data)
 }
