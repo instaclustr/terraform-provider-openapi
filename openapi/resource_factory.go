@@ -41,8 +41,6 @@ func newResourceFactory(openAPIResource SpecResource) resourceFactory {
 }
 
 func (r resourceFactory) createTerraformResource() (*schema.Resource, error) {
-	log.Printf("[resource_factory createTerraformResource - longlonglonglong]")
-
 	s, err := r.createTerraformResourceSchema()
 	if err != nil {
 		return nil, err
@@ -90,8 +88,6 @@ func (r resourceFactory) createTerraformResourceSchema() (map[string]*schema.Sch
 }
 
 func (r resourceFactory) create(data *schema.ResourceData, i interface{}) error {
-	log.Printf("[resource_factory create start - longlonglonglong] state %s -- data %s", data.State(), data)
-
 	providerClient := i.(ClientOpenAPI)
 
 	if r.openAPIResource == nil {
@@ -129,14 +125,10 @@ func (r resourceFactory) create(data *schema.ResourceData, i interface{}) error 
 		return fmt.Errorf("polling mechanism failed after POST %s call with response status code (%d): %s", resourcePath, res.StatusCode, err)
 	}
 
-	log.Printf("[resource_factory create end - longlonglonglong] state %s -- data %s", data.State(), data)
-
 	return updateStateWithPayloadData(r.openAPIResource, responsePayload, data)
 }
 
 func (r resourceFactory) readWithOptions(data *schema.ResourceData, i interface{}, handleNotFoundErr bool) error {
-	log.Printf("[resource_factory readWithOptions - longlonglonglong] handleNotFoundErr %t -- data %s", handleNotFoundErr, data.State())
-
 	openAPIClient := i.(ClientOpenAPI)
 
 	if r.openAPIResource == nil {
@@ -156,7 +148,9 @@ func (r resourceFactory) readWithOptions(data *schema.ResourceData, i interface{
 	if err != nil {
 		if openapiErr, ok := err.(openapierr.Error); ok {
 			if openapierr.NotFound == openapiErr.Code() && !handleNotFoundErr {
-				log.Printf("[resource_factory readWithOptions - longlonglonglong] removing id of resource")
+				// terraform refresh needs to accept 404 response as resource deleted
+				// so that manually deleted resource can be detected and restored by terraform
+				// emptying resource ID means resource removal from state
 				data.SetId("")
 				return nil
 			}
@@ -168,7 +162,6 @@ func (r resourceFactory) readWithOptions(data *schema.ResourceData, i interface{
 }
 
 func (r resourceFactory) read(data *schema.ResourceData, i interface{}) error {
-	log.Printf("[resource_factory read - longlonglonglong] ")
 	return r.readWithOptions(data, i, false)
 }
 
@@ -212,8 +205,6 @@ func (r resourceFactory) getParentIDs(data *schema.ResourceData) ([]string, erro
 }
 
 func (r resourceFactory) update(data *schema.ResourceData, i interface{}) error {
-	log.Printf("[resource_factory update - longlonglonglong] data %s", data)
-
 	providerClient := i.(ClientOpenAPI)
 
 	if r.openAPIResource == nil {
@@ -273,8 +264,6 @@ func (r resourceFactory) update(data *schema.ResourceData, i interface{}) error 
 }
 
 func (r resourceFactory) delete(data *schema.ResourceData, i interface{}) error {
-	log.Printf("[resource_factory delete start - longlonglonglong] data %s", data)
-
 	providerClient := i.(ClientOpenAPI)
 
 	if r.openAPIResource == nil {
@@ -305,14 +294,11 @@ func (r resourceFactory) delete(data *schema.ResourceData, i interface{}) error 
 		}
 		return fmt.Errorf("[resource='%s'] DELETE %s/%s failed: %s", r.openAPIResource.GetResourceName(), resourcePath, data.Id(), err)
 	}
-	log.Printf("[resource_factory delete 11111 - longlonglonglong] data %s", data)
 
 	err = r.handlePollingIfConfigured(nil, data, providerClient, operation, res.StatusCode, schema.TimeoutDelete)
 	if err != nil {
 		return fmt.Errorf("polling mechanism failed after DELETE %s call with response status code (%d): %s", resourcePath, res.StatusCode, err)
 	}
-
-	log.Printf("[resource_factory delete end - longlonglonglong] data %s", data)
 
 	return nil
 }
@@ -442,8 +428,6 @@ func (r resourceFactory) resourceStateRefreshFunc(resourceLocalData *schema.Reso
 }
 
 func (r resourceFactory) checkImmutableFields(updatedResourceLocalData *schema.ResourceData, openAPIClient ClientOpenAPI, parentIDs ...string) error {
-	log.Printf("[resource_factory checkImmutableFields - longlonglonglong] data %s", updatedResourceLocalData)
-
 	remoteData, err := r.readRemote(updatedResourceLocalData.Id(), openAPIClient, parentIDs...)
 	if err != nil {
 		return err
