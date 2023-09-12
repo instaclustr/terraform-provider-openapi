@@ -162,13 +162,6 @@ func updateStateWithPayloadDataAndOptions(openAPIResource SpecResource, remoteDa
 			}
 		}
 	}
-	if len(remoteData) == 0 {
-		log.Printf("[updateStateWithPayloadDataAndOptions mark tain- longlonglonglong] resourceLocalData %s", resourceLocalData.State().Tainted)
-
-		resourceLocalData.State().Tainted = true
-		resourceLocalData.SetId("")
-		//resourceLocalData.State().Set(nil)
-	}
 	log.Printf("[updateStateWithPayloadDataAndOptions final updated- longlonglonglong] resourceLocalData %s  ---- raw %s", resourceLocalData.State(), resourceLocalData)
 	return nil
 }

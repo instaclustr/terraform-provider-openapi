@@ -156,7 +156,9 @@ func (r resourceFactory) readWithOptions(data *schema.ResourceData, i interface{
 	if err != nil {
 		if openapiErr, ok := err.(openapierr.Error); ok {
 			if openapierr.NotFound == openapiErr.Code() && !handleNotFoundErr {
-				return updateStateWithPayloadData(r.openAPIResource, map[string]interface{}{}, data)
+				log.Printf("[resource_factory readWithOptions - longlonglonglong] removing id of resource")
+				data.SetId("")
+				return nil
 			}
 		}
 		return fmt.Errorf("[resource='%s'] GET %s/%s failed: %s", r.openAPIResource.GetResourceName(), resourcePath, data.Id(), err)
