@@ -159,7 +159,6 @@ func updateStateWithPayloadDataAndOptions(openAPIResource SpecResource, remoteDa
 			}
 		}
 	}
-
 	return nil
 }
 
