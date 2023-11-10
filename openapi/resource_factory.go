@@ -596,7 +596,12 @@ func (r resourceFactory) createPayloadFromTerraformConfig(resourceLocalData *sch
 		// then the key is likely in ignore_changes
 		if stateValue, ok := terraformStateObject[key]; ok {
 			configValue := terraformConfigObject[key]
-			log.Printf("[DEBUG] checkDiffValue: key %s value %s and %s", key, configValue, stateValue )
+			log.Printf("[DEBUG] checkDiffValue: key %s ---------------------------------------------", key )
+			log.Printf("[DEBUG] %s", configValue)
+			log.Printf("[DEBUG]  ---------------------------------------------")
+			log.Printf("[DEBUG] %s", stateValue)
+			log.Printf("[DEBUG]  ---------------------------------------------")
+
 			if !compareValues(configValue, stateValue) && !resourceLocalData.HasChange(key) {
 				ignoredKeys = append(ignoredKeys, key)
 			}
