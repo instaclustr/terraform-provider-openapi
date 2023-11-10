@@ -557,6 +557,35 @@ func (r resourceFactory) createPayloadFromLocalStateData(resourceLocalData *sche
 	return input
 }
 
+func compareValues(value1, value2 interface{}) bool {
+	switch value1 := value1.(type) {
+	case []interface{}:
+		value2, ok := value2.([]interface{})
+		if !ok || len(value1) != len(value2) {
+			return false
+		}
+		for i := range value1 {
+			if !compareValues(value1[i], value2[i]) {
+				return false
+			}
+		}
+		return true
+	case map[string]interface{}:
+		value2, ok := value2.(map[string]interface{})
+		if !ok || len(value1) != len(value2) {
+			return false
+		}
+		for key := range value1 {
+			if !compareValues(value1[key], value2[key]) {
+				return false
+			}
+		}
+		return true
+	default:
+		return value1 == value2
+	}
+}
+
 // Similar to createPayloadFromLocalStateData but uses the current terraform configuration to create the request payload
 func (r resourceFactory) createPayloadFromTerraformConfig(resourceLocalData *schema.ResourceData) map[string]interface{} {
 	terraformConfigObject := getTerraformConfigObject(resourceLocalData.GetRawConfig()).(map[string]interface{})
@@ -567,12 +596,11 @@ func (r resourceFactory) createPayloadFromTerraformConfig(resourceLocalData *sch
 		// then the key is likely in ignore_changes
 		if stateValue, ok := terraformStateObject[key]; ok {
 			configValue := terraformConfigObject[key]
-			if configValue != stateValue && !resourceLocalData.HasChange(key) {
+			if !compareValues(configValue, stateValue) && !resourceLocalData.HasChange(key) {
 				ignoredKeys = append(ignoredKeys, key)
 			}
 		}
 	}
-
 	// Now, ignoredKeys should contain the keys that are in ignore_changes
 	log.Printf("[DEBUG] checkIgnoreChanges: %s", ignoredKeys )
 	input := map[string]interface{}{}
