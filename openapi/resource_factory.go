@@ -482,7 +482,6 @@ func (r resourceFactory) validateImmutableProperty(property *SpecSchemaDefinitio
 					localObj := localListObj.(map[string]interface{})
 					remoteObj := remoteListObj.(map[string]interface{})
 					for _, objectProp := range property.SpecSchemaDefinition.Properties {
-						log.Printf("[DEBUG] [resource='%s'] wenbo schemaDefinitionPropertyCheckTerraform: %s", objectProp.GetTerraformCompliantPropertyName())
 						err := r.validateImmutableProperty(objectProp, remoteObj[objectProp.Name], localObj[objectProp.GetTerraformCompliantPropertyName()], property.Immutable)
 						if err != nil {
 							return fmt.Errorf("user attempted to update an immutable list of objects ('%s'): [user input: %s; actual: %s]", property.Name, localData, remoteData)
@@ -551,7 +550,7 @@ func (r resourceFactory) createPayloadFromLocalStateData(resourceLocalData *sche
 					log.Printf("[ERROR] [resource='%s'] error when creating the property payload for property '%s': %s", r.openAPIResource.GetResourceName(), propertyName, err)
 				}
 			}
-			log.Printf("[DEBUG] [resource='%s'] property payload [propertyName: %s; propertyValue: %+v]", r.openAPIResource.GetResourceName(), propertyName, input[propertyName])
+			log.Printf("[DEBUG] [resource='%s'] property payload from LocalData [propertyName: %s; propertyValue: %+v]", r.openAPIResource.GetResourceName(), propertyName, input[propertyName])
 		}
 	}
 	log.Printf("[DEBUG] [resource='%s'] createPayloadFromLocalStateData: %s", r.openAPIResource.GetResourceName(), sPrettyPrint(input))
@@ -572,12 +571,13 @@ func (r resourceFactory) createPayloadFromTerraformConfig(resourceLocalData *sch
 		}
 		if !property.IsParentProperty {
 			if dataValue, ok := terraformConfigObject[property.GetTerraformCompliantPropertyName()]; ok {
+				log.Printf("[DEBUG] [resource='%s'] wenbo schemaDefinitionPropertyCheckTerraform: %s", property.GetTerraformCompliantPropertyName())
 				err := r.populatePayload(input, property, dataValue)
 				if err != nil {
 					log.Printf("[ERROR] [resource='%s'] error when creating the property payload for property '%s': %s", r.openAPIResource.GetResourceName(), propertyName, err)
 				}
 			}
-			log.Printf("[DEBUG] [resource='%s'] property payload [propertyName: %s; propertyValue: %+v]", r.openAPIResource.GetResourceName(), propertyName, input[propertyName])
+			log.Printf("[DEBUG] [resource='%s'] property payload from TerraformConfig [propertyName: %s; propertyValue: %+v]", r.openAPIResource.GetResourceName(), propertyName, input[propertyName])
 		}
 	}
 	log.Printf("[DEBUG] [resource='%s'] createPayloadFromTerraformConfig: %s", r.openAPIResource.GetResourceName(), sPrettyPrint(input))
