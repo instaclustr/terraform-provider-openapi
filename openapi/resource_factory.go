@@ -560,7 +560,21 @@ func (r resourceFactory) createPayloadFromLocalStateData(resourceLocalData *sche
 // Similar to createPayloadFromLocalStateData but uses the current terraform configuration to create the request payload
 func (r resourceFactory) createPayloadFromTerraformConfig(resourceLocalData *schema.ResourceData) map[string]interface{} {
 	terraformConfigObject := getTerraformConfigObject(resourceLocalData.GetRawConfig()).(map[string]interface{})
+	terraformStateObject := getTerraformConfigObject(resourceLocalData.GetRawState()).(map[string]interface{})
+	var ignoredKeys []string
+	for key := range terraformConfigObject {
+		// If the key is also in the state, and the values are different, but HasChange returns false,
+		// then the key is likely in ignore_changes
+		if stateValue, ok := terraformStateObject[key]; ok {
+			configValue := terraformConfigObject[key]
+			if configValue != stateValue && !resourceLocalData.HasChange(key) {
+				ignoredKeys = append(ignoredKeys, key)
+			}
+		}
+	}
 
+	// Now, ignoredKeys should contain the keys that are in ignore_changes
+	log.Printf("[DEBUG] checkIgnoreChanges: %s", ignoredKeys )
 	input := map[string]interface{}{}
 	resourceSchema, _ := r.openAPIResource.GetResourceSchema()
 	for _, property := range resourceSchema.Properties {
