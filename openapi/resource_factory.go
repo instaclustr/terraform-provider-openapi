@@ -611,7 +611,7 @@ func (r resourceFactory) createPayloadFromTerraformConfig(resourceLocalData *sch
 		}
 	}
 	// Now, ignoredKeys should contain the keys that are in ignore_changes
-	log.Printf("[DEBUG] checkIgnoreChanges: %s", ignoredKeys )
+	log.Printf("[INFO] checkIgnoreChanges: %s", ignoredKeys )
 	input := map[string]interface{}{}
 	resourceSchema, _ := r.openAPIResource.GetResourceSchema()
 	for _, property := range resourceSchema.Properties {
@@ -622,7 +622,9 @@ func (r resourceFactory) createPayloadFromTerraformConfig(resourceLocalData *sch
 		}
 		if !property.IsParentProperty {
 			if dataValue, ok := terraformConfigObject[property.GetTerraformCompliantPropertyName()]; ok {
-				log.Printf("[DEBUG] [resource='%s'] wenbo schemaDefinitionPropertyCheckTerraform: %s", property.GetTerraformCompliantPropertyName())
+				dataValue1, ok1 := r.getResourceDataOKExists(*property, resourceLocalData);
+				log.Printf("[INFO] [resource='%s'] wenbo schemaDefinitionPropertyCheckTerraform: %s", dataValue)
+				log.Printf("[INFO] [resource='%s'] wenbo schemaDefinitionPropertyCheckTerraform: %s", dataValue1)
 				err := r.populatePayload(input, property, dataValue)
 				if err != nil {
 					log.Printf("[ERROR] [resource='%s'] error when creating the property payload for property '%s': %s", r.openAPIResource.GetResourceName(), propertyName, err)
