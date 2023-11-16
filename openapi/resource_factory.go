@@ -623,8 +623,10 @@ func (r resourceFactory) createPayloadFromTerraformConfig(resourceLocalData *sch
 		if !property.IsParentProperty {
 			if dataValue, ok := terraformConfigObject[property.GetTerraformCompliantPropertyName()]; ok {
 				dataValue1, ok1 := r.getResourceDataOKExists(*property, resourceLocalData);
-				log.Printf("[INFO] [resource='%s'] wenbo schemaDefinitionPropertyCheckTerraform: %s", dataValue)
-				log.Printf("[INFO] [resource='%s'] wenbo schemaDefinitionPropertyCheckTerraform: %s", dataValue1)
+				log.Printf("[INFO]  ---------------------------------------------")
+				log.Printf("[INFO]  wenbo schemaDefinitionPropertyCheckTerraform: %s", dataValue)
+				log.Printf("[INFO]  wenbo schemaDefinitionPropertyCheckTerraform: %s", dataValue1)
+				log.Printf("[INFO]  ---------------------------------------------%t",ok1)
 				err := r.populatePayload(input, property, dataValue)
 				if err != nil {
 					log.Printf("[ERROR] [resource='%s'] error when creating the property payload for property '%s': %s", r.openAPIResource.GetResourceName(), propertyName, err)
