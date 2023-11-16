@@ -597,11 +597,11 @@ func (r resourceFactory) createPayloadFromTerraformConfig(resourceLocalData *sch
 		if stateValue, ok := terraformStateObject[key]; ok {
 			configValue := terraformConfigObject[key]
 			log.Printf("[INFO] checkDiffValue: key %s ---------------------------------------------", key )
-			log.Printf("[INFO] %s", configValue)
+			log.Printf("[INFO] value 1 %s", configValue)
 			log.Printf("[INFO]  ---------------------------------------------")
-			log.Printf("[INFO] %s", stateValue)
+			log.Printf("[INFO] value 2 %s", stateValue)
 			log.Printf("[INFO]  ---------------------------------------------")
-			log.Printf("[INFO] %s", resourceLocalData.Get(key))
+			log.Printf("[INFO] value 3 %s", resourceLocalData.Get(key))
 			log.Printf("[INFO]  ---------------------------------------------")
 
 
