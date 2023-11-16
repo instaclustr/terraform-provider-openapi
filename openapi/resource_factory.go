@@ -225,10 +225,10 @@ func (r resourceFactory) update(data *schema.ResourceData, i interface{}) error 
 	}
 
 	requestPayload := r.createPayloadFromTerraformConfig(data)
-	log.Printf("[DEBUG] [resource='%s'] wenbo createPayloadFromTerraformConfig: %s", r.openAPIResource.GetResourceName(), sPrettyPrint(requestPayload))
+	log.Printf("[INFO] [resource='%s'] wenbo createPayloadFromTerraformConfig: %s", r.openAPIResource.GetResourceName(), sPrettyPrint(requestPayload))
 
 	requestPayloadLocal := r.createPayloadFromLocalStateData(data)
-	log.Printf("[DEBUG] [resource='%s'] wenbo createPayloadFromLocalStateData: %s", r.openAPIResource.GetResourceName(), sPrettyPrint(requestPayloadLocal))
+	log.Printf("[INFO] [resource='%s'] wenbo createPayloadFromLocalStateData: %s", r.openAPIResource.GetResourceName(), sPrettyPrint(requestPayloadLocal))
 
 
 	if err := r.checkImmutableFields(data, providerClient, parentsIDs...); err != nil {
