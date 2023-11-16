@@ -622,12 +622,12 @@ func (r resourceFactory) createPayloadFromTerraformConfig(resourceLocalData *sch
 		}
 		if !property.IsParentProperty {
 			if dataValue, ok := terraformConfigObject[property.GetTerraformCompliantPropertyName()]; ok {
-				dataValue1, ok1 := r.getResourceDataOKExists(*property, resourceLocalData);
+				resourceDataValue, ok1 := r.getResourceDataOKExists(*property, resourceLocalData);
 				log.Printf("[INFO]  ---------------------------------------------")
 				log.Printf("[INFO]  wenbo schemaDefinitionPropertyCheckTerraform: %s", dataValue)
-				log.Printf("[INFO]  wenbo schemaDefinitionPropertyCheckTerraform: %s", dataValue1)
+				log.Printf("[INFO]  wenbo schemaDefinitionPropertyCheckTerraform: %s", resourceDataValue)
 				log.Printf("[INFO]  ---------------------------------------------%t",ok1)
-				err := r.populatePayload(input, property, dataValue)
+				err := r.populatePayload(input, property, dataValue, resourceDataValue)
 				if err != nil {
 					log.Printf("[ERROR] [resource='%s'] error when creating the property payload for property '%s': %s", r.openAPIResource.GetResourceName(), propertyName, err)
 				}
@@ -637,6 +637,96 @@ func (r resourceFactory) createPayloadFromTerraformConfig(resourceLocalData *sch
 	}
 	log.Printf("[DEBUG] [resource='%s'] createPayloadFromTerraformConfig: %s", r.openAPIResource.GetResourceName(), sPrettyPrint(input))
 	return input
+}
+
+func (r resourceFactory) populatePayloadOrdered(input map[string]interface{}, property *SpecSchemaDefinitionProperty, dataValue interface{}, resourceDataValue interface{}) error {
+	if property == nil {
+		return errors.New("populatePayload must receive a non nil property")
+	}
+	if dataValue == nil {
+		return fmt.Errorf("property '%s' has a nil state dataValue", property.Name)
+	}
+	if property.isReadOnly() {
+		return nil
+	}
+	dataValueKind := reflect.TypeOf(dataValue).Kind()
+	switch dataValueKind {
+	case reflect.Map:
+		objectInput := map[string]interface{}{}
+		mapValue := dataValue.(map[string]interface{})
+		log.Printf("[INFO] mapValue Input: %s", dataValue, resourceDataValue)
+		for propertyName, propertyValue := range mapValue {
+
+			if resourceDataMap, ok := resourceDataValue.(map[string]interface{}); ok {
+				// resourceDataValue is a map, and resourceDataMap holds its value
+				if propertyRealValue, exists := resourceDataMap[propertyName]; exists {
+					// propertyName is in the map, and value holds its value
+					schemaDefinitionProperty, err := property.SpecSchemaDefinition.getPropertyBasedOnTerraformName(propertyName)
+					if err != nil {
+						return err
+					}
+					if err := r.populatePayloadOrdered(objectInput, schemaDefinitionProperty, propertyValue, propertyRealValue); err != nil {
+						return err
+					}
+				} else {
+					// propertyName is not in the map
+					fmt.Errorf("property %s not found in the map", propertyName)
+				}
+			} else {
+				fmt.Errorf("resourceDataValue is not a map")
+				// resourceDataValue is not a map
+			}
+
+		}
+		input[property.Name] = objectInput
+	case reflect.Slice, reflect.Array:
+
+		if isListOfPrimitives, _ := property.isTerraformListOfSimpleValues(); isListOfPrimitives {
+			log.Printf("[INFO] Primitives arrays: %s", dataValue, resourceDataValue)
+			input[property.Name] = resourceDataValue.([]interface{})
+		} else {
+			// This is the work around put in place to have support for complex objects. In this case, because the
+			// state representation of nested objects is an array, we need to make sure we don't end up constructing an
+			// array but rather just a json object
+			log.Printf("[INFO] NonPrimitives arrays: %s", dataValue, resourceDataValue)
+			if property.shouldUseLegacyTerraformSDKBlockApproachForComplexObjects() {
+				arrayValue := dataValue.([]interface{})
+				arrayValueOrdered := resourceDataValue.([]interface{})
+				if len(arrayValue) != 1 {
+					return fmt.Errorf("something is really wrong here...an object property with nested objects should have exactly one elem in the terraform state list")
+				}
+				if err := r.populatePayloadOrdered(input, property, arrayValue[0], arrayValueOrdered[0]); err != nil {
+					return err
+				}
+			} else {
+				arrayInput := []interface{}{}
+				arrayValue := dataValue.([]interface{})
+				arrayValueOrdered := resourceDataValue.([]interface{})
+				for idx, arrayItem := range arrayValue {
+					objectInput := map[string]interface{}{}
+					if err := r.populatePayloadOrdered(objectInput, property, arrayItem, arrayValueOrdered[idx]); err != nil {
+						return err
+					}
+					// Only assign the value of the object, otherwise a dup key will be assigned which will cause problems. Example
+					// [propertyName: listeners; propertyValue: [map[options:[] origin_ingress_port:80 protocol:http shield_ingress_port:80]]]
+					// Here we just want to assign as value: map[options:[] origin_ingress_port:80 protocol:http shield_ingress_port:80]
+					arrayInput = append(arrayInput, objectInput[property.Name])
+				}
+				input[property.Name] = arrayInput
+			}
+		}
+	case reflect.String:
+		input[property.Name] = resourceDataValue.(string)
+	case reflect.Int:
+		input[property.Name] = resourceDataValue.(int)
+	case reflect.Float64:
+		input[property.Name] = resourceDataValue.(float64)
+	case reflect.Bool:
+		input[property.Name] = resourceDataValue.(bool)
+	default:
+		return fmt.Errorf("'%s' type not supported", property.Type)
+	}
+	return nil
 }
 
 func (r resourceFactory) populatePayload(input map[string]interface{}, property *SpecSchemaDefinitionProperty, dataValue interface{}) error {
@@ -665,6 +755,7 @@ func (r resourceFactory) populatePayload(input map[string]interface{}, property 
 		}
 		input[property.Name] = objectInput
 	case reflect.Slice, reflect.Array:
+
 		if isListOfPrimitives, _ := property.isTerraformListOfSimpleValues(); isListOfPrimitives {
 			input[property.Name] = dataValue.([]interface{})
 		} else {
