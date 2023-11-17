@@ -627,7 +627,7 @@ func (r resourceFactory) createPayloadFromTerraformConfig(resourceLocalData *sch
 				log.Printf("[INFO]  wenbo schemaDefinitionPropertyCheckTerraform: %s", dataValue)
 				log.Printf("[INFO]  wenbo schemaDefinitionPropertyCheckTerraform: %s", resourceDataValue)
 				log.Printf("[INFO]  ---------------------------------------------%t",ok1)
-				err := r.populatePayloadOrdered(input, property, dataValue, resourceDataValue)
+				err := r.populatePayload(input, property, dataValue)
 				if err != nil {
 					log.Printf("[ERROR] [resource='%s'] error when creating the property payload for property '%s': %s", r.openAPIResource.GetResourceName(), propertyName, err)
 				}
