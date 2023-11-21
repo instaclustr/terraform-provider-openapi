@@ -476,6 +476,34 @@ func (r resourceFactory) validateImmutableProperty(property *SpecSchemaDefinitio
 				}
 			}
 		}
+	case TypeSet:
+		if property.Immutable {
+			localSet := localData.([]interface{})
+			remoteSet := remoteData.([]interface{})
+			if len(localSet) != len(remoteSet) {
+				return fmt.Errorf("user attempted to update an immutable set property ('%s') size: [user input list size: %d; actual list size: %d]", property.Name, len(localSet), len(remoteSet))
+			}
+			if isListOfPrimitives, _ := property.isTerraformListOfSimpleValues(); isListOfPrimitives {
+
+				for idx, elem := range localSet {
+					if elem != remoteSet[idx] {
+						return fmt.Errorf("user attempted to update an immutable set property ('%s') element: [user input: %+v; actual: %+v]", property.Name, localSet, remoteSet)
+					}
+				}
+			} else {
+				for idx, localListObj := range localSet {
+					remoteListObj := remoteSet[idx]
+					localObj := localListObj.(map[string]interface{})
+					remoteObj := remoteListObj.(map[string]interface{})
+					for _, objectProp := range property.SpecSchemaDefinition.Properties {
+						err := r.validateImmutableProperty(objectProp, remoteObj[objectProp.Name], localObj[objectProp.Name], property.Immutable)
+						if err != nil {
+							return fmt.Errorf("user attempted to update an immutable set of objects ('%s'): [user input: %s; actual: %s]", property.Name, localData, remoteData)
+						}
+					}
+				}
+			}
+		}
 	case TypeObject:
 		localObject := localData.(map[string]interface{})
 		remoteObject := remoteData.(map[string]interface{})

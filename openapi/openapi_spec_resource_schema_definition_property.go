@@ -436,6 +436,41 @@ func (s *SpecSchemaDefinitionProperty) equalItems(itemsType schemaDefinitionProp
 		for idx := range list1 {
 			return s.equalItems(s.ArrayItemsType, list1[idx], list2[idx])
 		}
+	case TypeSet:
+		if !s.validateValueType(item1, reflect.Slice) || !s.validateValueType(item2, reflect.Slice) {
+			return false
+		}
+		if item1 == nil || item2 == nil {
+			return s.isOptional()
+		}
+		set1 := item1.([]interface{})
+		set2 := item2.([]interface{})
+
+		if s.isOptional() && (len(set1) == 0 || len(set2) == 0) {
+			return true
+		}
+
+		if len(set1) != len(set2) {
+			return false
+		}
+		if s.shouldIgnoreOrder() {
+			for idx := range set1 {
+				match := false
+				for idx2 := range set2 {
+					if s.equalItems(s.SetItemsType, set1[idx], set2[idx2]) {
+						match = true
+						break
+					}
+				}
+				if !match {
+					return false
+				}
+			}
+			return true
+		}
+		for idx := range set1 {
+			return s.equalItems(s.ArrayItemsType, set1[idx], set2[idx])
+		}
 	case TypeObject:
 		item1, _ = terraformutils.CastTerraformSliceToMap(item1) // deal with terraform schema returning nested objects as slices
 		item2, _ = terraformutils.CastTerraformSliceToMap(item2)
