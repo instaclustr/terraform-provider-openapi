@@ -237,6 +237,41 @@ func convertPayloadToLocalStateDataValue(property *SpecSchemaDefinitionProperty,
 			return arrayInput, nil
 		}
 		return nil, fmt.Errorf("property '%s' is supposed to be an array objects", property.Name)
+	case TypeSet:
+		if isListOfPrimitives, _ := property.isTerraformListOfSimpleValues(); isListOfPrimitives {
+			return propertyValue, nil
+		}
+		if property.isArrayOfObjectsProperty() {
+			arrayInput := []interface{}{}
+
+			arrayValue := make([]interface{}, 0)
+			if propertyValue != nil {
+				arrayValue = propertyValue.([]interface{})
+			}
+
+			localStateArrayValue := make([]interface{}, 0)
+			if propertyLocalStateValue != nil {
+				localStateArrayValue = propertyLocalStateValue.([]interface{})
+			}
+
+			for arrayIdx := 0; arrayIdx < intMax(len(arrayValue), len(localStateArrayValue)); arrayIdx++ {
+				var arrayItem interface{} = nil
+				if arrayIdx < len(arrayValue) {
+					arrayItem = arrayValue[arrayIdx]
+				}
+				var localStateArrayItem interface{} = nil
+				if arrayIdx < len(localStateArrayValue) {
+					localStateArrayItem = localStateArrayValue[arrayIdx]
+				}
+				objectValue, err := convertObjectToLocalStateData(property, arrayItem, localStateArrayItem)
+				if err != nil {
+					return err, nil
+				}
+				arrayInput = append(arrayInput, objectValue)
+			}
+			return arrayInput, nil
+		}
+		return nil, fmt.Errorf("property '%s' is supposed to be an array objects", property.Name)
 	case TypeString:
 		if propertyValue == nil {
 			return nil, nil

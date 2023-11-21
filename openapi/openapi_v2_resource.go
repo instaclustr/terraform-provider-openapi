@@ -547,8 +547,9 @@ func (o *SpecV2Resource) isOptionalComputedProperty(propertyName string, propert
 // by specifying the default attribute. Example:
 //
 // optional_computed_with_default:  # optional property that the default value is known at runtime, hence service provider documents it
-//  type: "string"
-//  default: “some known default value”
+//
+//	type: "string"
+//	default: “some known default value”
 func (o *SpecV2Resource) isOptionalComputedWithDefault(propertyName string, property spec.Schema) (bool, error) {
 	if !property.ReadOnly && property.Default != nil {
 		if o.isBoolExtensionEnabled(property.Extensions, extTfComputed) {
@@ -563,8 +564,9 @@ func (o *SpecV2Resource) isOptionalComputedWithDefault(propertyName string, prop
 // This covers the use case where a property is not marked as readOnly but still is optional value that can come from the user or if not provided will be computed by the API. Example
 //
 // optional_computed: # optional property that the default value is NOT known at runtime
-//  type: "string"
-//  x-terraform-computed: true
+//
+//	type: "string"
+//	x-terraform-computed: true
 func (o *SpecV2Resource) isOptionalComputed(propertyName string, property spec.Schema) (bool, error) {
 	if o.isBoolExtensionEnabled(property.Extensions, extTfComputed) {
 		if property.ReadOnly {
@@ -579,6 +581,10 @@ func (o *SpecV2Resource) isOptionalComputed(propertyName string, property spec.S
 }
 
 func (o *SpecV2Resource) isArrayItemPrimitiveType(propertyType schemaDefinitionPropertyType) bool {
+	return propertyType == TypeString || propertyType == TypeInt || propertyType == TypeFloat || propertyType == TypeBool
+}
+
+func (o *SpecV2Resource) isSetItemPrimitiveType(propertyType schemaDefinitionPropertyType) bool {
 	return propertyType == TypeString || propertyType == TypeInt || propertyType == TypeFloat || propertyType == TypeBool
 }
 
@@ -599,8 +605,27 @@ func (o *SpecV2Resource) validateArrayItems(property spec.Schema) (schemaDefinit
 	return itemsType, nil
 }
 
+func (o *SpecV2Resource) validateSetItems(property spec.Schema) (schemaDefinitionPropertyType, error) {
+	if property.Items == nil || property.Items.Schema == nil {
+		return "", fmt.Errorf("set property is missing items schema definition")
+	}
+	if o.isSetTypeProperty(*property.Items.Schema) {
+		return "", fmt.Errorf("set property can not have items of type 'set'")
+	}
+	itemsType, err := o.getPropertyType(*property.Items.Schema)
+	if err != nil {
+		return "", err
+	}
+	if !o.isSetItemPrimitiveType(itemsType) && !(itemsType == TypeObject) {
+		return "", fmt.Errorf("set item type '%s' not supported", itemsType)
+	}
+	return itemsType, nil
+}
+
 func (o *SpecV2Resource) getPropertyType(property spec.Schema) (schemaDefinitionPropertyType, error) {
-	if o.isArrayTypeProperty(property) {
+	if o.isSetTypeProperty(property) {
+		return TypeSet, nil
+	} else if o.isArrayTypeProperty(property) {
 		return TypeList, nil
 	} else if isObject, _, err := o.isObjectProperty(property); isObject || err != nil {
 		return TypeObject, err
@@ -657,6 +682,34 @@ func (o *SpecV2Resource) isArrayProperty(property spec.Schema) (bool, schemaDefi
 		}
 	}
 	return false, "", nil, nil
+}
+
+func (o *SpecV2Resource) isSetProperty(property spec.Schema) (bool, schemaDefinitionPropertyType, *SpecSchemaDefinition, error) {
+	if o.isSetTypeProperty(property) {
+		itemsType, err := o.validateSetItems(property)
+		if err != nil {
+			return false, "", nil, err
+		}
+		if o.isArrayItemPrimitiveType(itemsType) {
+			return true, itemsType, nil, nil
+		}
+		// This is the case where items must be object
+		if isObject, schemaDefinition, err := o.isObjectProperty(*property.Items.Schema); isObject || err != nil {
+			if err != nil {
+				return true, itemsType, nil, err
+			}
+			objectSchemaDefinition, err := o.getSchemaDefinition(schemaDefinition)
+			if err != nil {
+				return true, itemsType, nil, err
+			}
+			return true, itemsType, objectSchemaDefinition, nil
+		}
+	}
+	return false, "", nil, nil
+}
+
+func (o *SpecV2Resource) isSetTypeProperty(property spec.Schema) bool {
+	return o.isOfType(property, "set")
 }
 
 func (o *SpecV2Resource) isArrayTypeProperty(property spec.Schema) bool {
