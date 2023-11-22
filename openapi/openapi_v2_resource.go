@@ -735,6 +735,9 @@ func (o *SpecV2Resource) isSetProperty(property spec.Schema) (bool, schemaDefini
 
 func (o *SpecV2Resource) isSetTypeProperty(property spec.Schema) bool {
 	return o.isOfType(property, "array")
+	//struct {
+	//
+	//}{}
 }
 
 func (o *SpecV2Resource) isArrayTypeProperty(property spec.Schema) bool {
