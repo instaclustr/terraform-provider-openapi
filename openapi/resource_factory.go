@@ -454,7 +454,7 @@ func (r resourceFactory) validateImmutableProperty(property *SpecSchemaDefinitio
 		return nil
 	}
 	switch property.Type {
-	case TypeList:
+	case TypeSet:
 		if property.Immutable {
 			localList := localData.([]interface{})
 			remoteList := make([]interface{}, 0)

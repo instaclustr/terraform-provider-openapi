@@ -219,7 +219,7 @@ func convertPayloadToLocalStateDataValue(property *SpecSchemaDefinitionProperty,
 	switch property.Type {
 	case TypeObject:
 		return convertObjectToLocalStateData(property, propertyValue, propertyLocalStateValue)
-	case TypeList:
+	case TypeSet:
 		if isListOfPrimitives, _ := property.isTerraformListOfSimpleValues(); isListOfPrimitives {
 			return propertyValue, nil
 		}

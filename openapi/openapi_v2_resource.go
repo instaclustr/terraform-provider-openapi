@@ -601,7 +601,7 @@ func (o *SpecV2Resource) validateArrayItems(property spec.Schema) (schemaDefinit
 
 func (o *SpecV2Resource) getPropertyType(property spec.Schema) (schemaDefinitionPropertyType, error) {
 	if o.isArrayTypeProperty(property) {
-		return TypeList, nil
+		return TypeSet, nil
 	} else if isObject, _, err := o.isObjectProperty(property); isObject || err != nil {
 		return TypeObject, err
 	} else if property.Type.Contains("string") {

@@ -23,7 +23,7 @@ const (
 	// TypeBool defines a schema definition property of type bool
 	TypeBool schemaDefinitionPropertyType = "boolean"
 	// TypeList defines a schema definition property of type list
-	TypeList schemaDefinitionPropertyType = "list"
+	TypeSet schemaDefinitionPropertyType = "list"
 	// TypeObject defines a schema definition property of type object
 	TypeObject schemaDefinitionPropertyType = "object"
 )
@@ -103,15 +103,15 @@ func (s *SpecSchemaDefinitionProperty) isObjectProperty() bool {
 }
 
 func (s *SpecSchemaDefinitionProperty) isArrayProperty() bool {
-	return s.Type == TypeList
+	return s.Type == TypeSet
 }
 
 func (s *SpecSchemaDefinitionProperty) shouldIgnoreOrder() bool {
-	return s.Type == TypeList && s.IgnoreItemsOrder
+	return s.Type == TypeSet && s.IgnoreItemsOrder
 }
 
 func (s *SpecSchemaDefinitionProperty) isArrayOfObjectsProperty() bool {
-	return s.Type == TypeList && s.ArrayItemsType == TypeObject
+	return s.Type == TypeSet && s.ArrayItemsType == TypeObject
 }
 
 func (s *SpecSchemaDefinitionProperty) isReadOnly() bool {
@@ -167,8 +167,8 @@ func (s *SpecSchemaDefinitionProperty) terraformType() (schema.ValueType, error)
 		return schema.TypeFloat, nil
 	case TypeBool:
 		return schema.TypeBool, nil
-	case TypeObject, TypeList:
-		return schema.TypeList, nil
+	case TypeObject, TypeSet:
+		return schema.TypeSet, nil
 	}
 	return schema.TypeInvalid, fmt.Errorf("non supported type %s", s.Type)
 }
@@ -188,7 +188,7 @@ func (s *SpecSchemaDefinitionProperty) isTerraformListOfSimpleValues() (bool, *s
 }
 
 func (s *SpecSchemaDefinitionProperty) terraformObjectSchema() (*schema.Resource, error) {
-	if s.Type == TypeObject || (s.Type == TypeList && s.ArrayItemsType == TypeObject) {
+	if s.Type == TypeObject || (s.Type == TypeSet && s.ArrayItemsType == TypeObject) {
 		if s.SpecSchemaDefinition == nil {
 			return nil, fmt.Errorf("missing spec schema definition for property '%s' of type '%s'", s.Name, s.Type)
 		}
@@ -201,7 +201,7 @@ func (s *SpecSchemaDefinitionProperty) terraformObjectSchema() (*schema.Resource
 		}
 		return elem, nil
 	}
-	return nil, fmt.Errorf("object schema can only be formed for types %s or types %s with elems of type %s: found type='%s' elemType='%s' instead", TypeObject, TypeList, TypeObject, s.Type, s.ArrayItemsType)
+	return nil, fmt.Errorf("object schema can only be formed for types %s or types %s with elems of type %s: found type='%s' elemType='%s' instead", TypeObject, TypeSet, TypeObject, s.Type, s.ArrayItemsType)
 }
 
 // shouldUseLegacyTerraformSDKBlockApproachForComplexObjects returns true if one of the following scenarios match:
@@ -241,7 +241,7 @@ func (s *SpecSchemaDefinitionProperty) terraformSchema() (*schema.Schema, error)
 		//	terraformSchema.Type = schema.TypeList
 		//	terraformSchema.MaxItems = 1
 		//}
-		terraformSchema.Type = schema.TypeList
+		terraformSchema.Type = schema.TypeSet
 		terraformSchema.MaxItems = 1
 		objectSchema, err := s.terraformObjectSchema()
 		if err != nil {
@@ -249,7 +249,7 @@ func (s *SpecSchemaDefinitionProperty) terraformSchema() (*schema.Schema, error)
 		}
 		terraformSchema.Elem = objectSchema
 
-	case TypeList:
+	case TypeSet:
 		if isListOfPrimitives, elemSchema := s.isTerraformListOfSimpleValues(); isListOfPrimitives {
 			terraformSchema.Elem = elemSchema
 		} else {
@@ -353,7 +353,7 @@ func (s *SpecSchemaDefinitionProperty) equalItems(itemsType schemaDefinitionProp
 		if !s.validateValueType(item1, reflect.Bool) || !s.validateValueType(item2, reflect.Bool) {
 			return false
 		}
-	case TypeList:
+	case TypeSet:
 		if !s.validateValueType(item1, reflect.Slice) || !s.validateValueType(item2, reflect.Slice) {
 			return false
 		}
@@ -423,7 +423,7 @@ func (s *SpecSchemaDefinitionProperty) equalItems(itemsType schemaDefinitionProp
 // this is called to sync order in 2 items that equals
 func (s *SpecSchemaDefinitionProperty) syncOrderWhenEqual(itemsType schemaDefinitionPropertyType, item1, item2 interface{}) interface{} {
 	switch itemsType {
-	case TypeList:
+	case TypeSet:
 		if !s.validateValueType(item1, reflect.Slice) || !s.validateValueType(item2, reflect.Slice) {
 			return item2
 		}
