@@ -435,6 +435,31 @@ func (o *SpecV2Resource) createSchemaDefinitionProperty(propertyName string, pro
 		}
 
 		log.Printf("[DEBUG] found array type property '%s' with items of type '%s'", propertyName, itemsType)
+	} else if isSet, itemsType, itemsSchema, err := o.isSetProperty(property); isSet || err != nil {
+		if err != nil {
+			return nil, fmt.Errorf("failed to process array type property '%s': %s", propertyName, err)
+		}
+
+		// Edge case where the description of the property is set under the items property instead of the root level
+		//       array_property:
+		//        items:
+		//          description: Groups allowed to manage this identity
+		//          type: string
+		//        type: array
+		if schemaDefinitionProperty.Description == "" {
+			if property.Items != nil && property.Items.Schema != nil {
+				schemaDefinitionProperty.Description = property.Items.Schema.Description
+			}
+		}
+
+		schemaDefinitionProperty.SetItemsType = itemsType
+		schemaDefinitionProperty.SpecSchemaDefinition = itemsSchema // only diff than nil if type is object
+
+		if o.isBoolExtensionEnabled(property.Extensions, extTfIgnoreOrder) || o.isBoolExtensionEnabled(property.Extensions, extIgnoreOrder) {
+			schemaDefinitionProperty.IgnoreItemsOrder = true
+		}
+
+		log.Printf("[DEBUG] found set type property '%s' with items of type '%s'", propertyName, itemsType)
 	}
 
 	if preferredPropertyName, exists := property.Extensions.GetString(extTfFieldName); exists {
@@ -713,7 +738,8 @@ func (o *SpecV2Resource) isSetTypeProperty(property spec.Schema) bool {
 }
 
 func (o *SpecV2Resource) isArrayTypeProperty(property spec.Schema) bool {
-	return o.isOfType(property, "array")
+	//return o.isOfType(property, "array")
+	return false
 }
 
 func (o *SpecV2Resource) isObjectTypeProperty(property spec.Schema) bool {
