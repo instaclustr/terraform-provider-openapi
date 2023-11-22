@@ -65,7 +65,7 @@ func (d dataSourceFactory) dataSourceFiltersSchema() *schema.Schema {
 					Required: true,
 				},
 				dataSourceFilterSchemaValuesPropertyName: {
-					Type:     schema.TypeSet,
+					Type:     schema.TypeList,
 					Required: true,
 					Elem:     &schema.Schema{Type: schema.TypeString},
 				},
