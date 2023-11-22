@@ -2,8 +2,10 @@ package openapi
 
 import (
 	"fmt"
+	"log"
 	"math"
 	"net/http"
+	"reflect"
 	"strconv"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
@@ -106,6 +108,7 @@ func (d dataSourceFactory) read(data *schema.ResourceData, i interface{}) error 
 
 	var filteredResults []map[string]interface{}
 	for _, payloadItem := range responsePayload {
+		log.Printf("[INFO] payloadItem %s | %s | %#v \n", reflect.TypeOf(payloadItem), reflect.ValueOf(payloadItem).Kind(), payloadItem)
 		match := d.filterMatch(filters, payloadItem)
 		if match {
 			filteredResults = append(filteredResults, payloadItem)
