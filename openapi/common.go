@@ -198,7 +198,7 @@ func convertPayloadToLocalStateDataValue(property *SpecSchemaDefinitionProperty,
 	if property.WriteOnly {
 		return propertyLocalStateValue, nil
 	}
-
+	log.Printf("[INFO] property name %s \n", property.Name)
 	switch property.Type {
 	case TypeObject:
 		return convertObjectToLocalStateData(property, propertyValue, propertyLocalStateValue)
