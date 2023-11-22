@@ -238,20 +238,28 @@ func convertPayloadToLocalStateDataValue(property *SpecSchemaDefinitionProperty,
 		}
 		return nil, fmt.Errorf("property '%s' is supposed to be an array objects", property.Name)
 	case TypeSet:
-		if isListOfPrimitives, _ := property.isTerraformListOfSimpleValues(); isListOfPrimitives {
+		log.Printf("[INFO] SET propertyValue and propertyLocalStateValue %s, %s\n", propertyValue, propertyLocalStateValue)
+		if isSetOfPrimitives, _ := property.isTerraformListOfSimpleValues(); isSetOfPrimitives {
 			return propertyValue, nil
 		}
 		if property.isSetOfObjectsProperty() {
-			setInput := []interface{}{}
+			setInput := make(map[string]struct{})
 
-			setValue := make([]interface{}, 0)
+			//setValue := make([]interface{}, 0)
+			//if propertyValue != nil {
+			//	setValue = propertyValue.([]interface{})
+			//}
+			setValue := make(map[interface{}]struct{})
 			if propertyValue != nil {
-				setValue = propertyValue.([]interface{})
+				for _, v := range propertyValue.([]interface{}) {
+					setValue[v] = struct{}{}
+				}
 			}
 
-			localStateSetValue := make([]interface{}, 0)
+			//localStateSetValue := make([]interface{}, 0)
+			localStateSetValue := make(map[string]struct{})
 			if propertyLocalStateValue != nil {
-				localStateSetValue = propertyLocalStateValue.([]interface{})
+				localStateSetValue = propertyLocalStateValue.(map[string]struct{})
 			}
 
 			for setIdx := 0; setIdx < intMax(len(setValue), len(localStateSetValue)); setIdx++ {
