@@ -165,6 +165,7 @@ func (r resourceFactory) readRemote(id string, providerClient ClientOpenAPI, par
 	var err error
 	responsePayload := map[string]interface{}{}
 	resp, err := providerClient.Get(r.openAPIResource, id, &responsePayload, parentIDs...)
+	log.Printf("[INFO] payloadItem %s | %s | %#v \n", reflect.TypeOf(payloadItem), reflect.ValueOf(payloadItem).Kind(), payloadItem)
 	if err != nil {
 		return nil, err
 	}
