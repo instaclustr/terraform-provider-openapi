@@ -241,37 +241,37 @@ func convertPayloadToLocalStateDataValue(property *SpecSchemaDefinitionProperty,
 		if isListOfPrimitives, _ := property.isTerraformListOfSimpleValues(); isListOfPrimitives {
 			return propertyValue, nil
 		}
-		if property.isArrayOfObjectsProperty() {
-			arrayInput := []interface{}{}
+		if property.isSetOfObjectsProperty() {
+			setInput := []interface{}{}
 
-			arrayValue := make([]interface{}, 0)
+			setValue := make([]interface{}, 0)
 			if propertyValue != nil {
-				arrayValue = propertyValue.([]interface{})
+				setValue = propertyValue.([]interface{})
 			}
 
-			localStateArrayValue := make([]interface{}, 0)
+			localStateSetValue := make([]interface{}, 0)
 			if propertyLocalStateValue != nil {
-				localStateArrayValue = propertyLocalStateValue.([]interface{})
+				localStateSetValue = propertyLocalStateValue.([]interface{})
 			}
 
-			for arrayIdx := 0; arrayIdx < intMax(len(arrayValue), len(localStateArrayValue)); arrayIdx++ {
-				var arrayItem interface{} = nil
-				if arrayIdx < len(arrayValue) {
-					arrayItem = arrayValue[arrayIdx]
+			for setIdx := 0; setIdx < intMax(len(setValue), len(localStateSetValue)); setIdx++ {
+				var setItem interface{} = nil
+				if setIdx < len(setValue) {
+					setItem = setValue[setIdx]
 				}
-				var localStateArrayItem interface{} = nil
-				if arrayIdx < len(localStateArrayValue) {
-					localStateArrayItem = localStateArrayValue[arrayIdx]
+				var localStateSetItem interface{} = nil
+				if setIdx < len(localStateSetValue) {
+					localStateSetItem = localStateSetValue[setIdx]
 				}
-				objectValue, err := convertObjectToLocalStateData(property, arrayItem, localStateArrayItem)
+				objectValue, err := convertObjectToLocalStateData(property, setItem, localStateSetItem)
 				if err != nil {
 					return err, nil
 				}
-				arrayInput = append(arrayInput, objectValue)
+				setInput = append(setInput, objectValue)
 			}
-			return arrayInput, nil
+			return setInput, nil
 		}
-		return nil, fmt.Errorf("property '%s' is supposed to be an array objects", property.Name)
+		return nil, fmt.Errorf("property '%s' is supposed to be an set objects", property.Name)
 	case TypeString:
 		if propertyValue == nil {
 			return nil, nil
