@@ -257,26 +257,26 @@ func convertPayloadToLocalStateDataValue(property *SpecSchemaDefinitionProperty,
 			}
 
 			//localStateSetValue := make([]interface{}, 0)
-			localStateSetValue := make(map[string]struct{})
-			if propertyLocalStateValue != nil {
-				localStateSetValue = propertyLocalStateValue.(map[string]struct{})
-			}
-
-			for setIdx := 0; setIdx < intMax(len(setValue), len(localStateSetValue)); setIdx++ {
-				var setItem interface{} = nil
-				if setIdx < len(setValue) {
-					setItem = setValue[setIdx]
-				}
-				var localStateSetItem interface{} = nil
-				if setIdx < len(localStateSetValue) {
-					localStateSetItem = localStateSetValue[setIdx]
-				}
-				objectValue, err := convertObjectToLocalStateData(property, setItem, localStateSetItem)
-				if err != nil {
-					return err, nil
-				}
-				setInput = append(setInput, objectValue)
-			}
+			//localStateSetValue := make(map[string]struct{})
+			//if propertyLocalStateValue != nil {
+			//	localStateSetValue = propertyLocalStateValue.(map[string]struct{})
+			//}
+			//
+			//for setIdx := 0; setIdx < intMax(len(setValue), len(localStateSetValue)); setIdx++ {
+			//	var setItem interface{} = nil
+			//	if setIdx < len(setValue) {
+			//		setItem = setValue[setIdx]
+			//	}
+			//	var localStateSetItem interface{} = nil
+			//	if setIdx < len(localStateSetValue) {
+			//		localStateSetItem = localStateSetValue[setIdx]
+			//	}
+			//	objectValue, err := convertObjectToLocalStateData(property, setItem, localStateSetItem)
+			//	if err != nil {
+			//		return err, nil
+			//	}
+			//	setInput = append(setInput, objectValue)
+			//}
 			return setInput, nil
 		}
 		return nil, fmt.Errorf("property '%s' is supposed to be an set objects", property.Name)
