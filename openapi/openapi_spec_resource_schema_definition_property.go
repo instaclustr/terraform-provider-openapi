@@ -327,7 +327,7 @@ func (s *SpecSchemaDefinitionProperty) terraformSchema() (*schema.Schema, error)
 	}
 
 	// ValidateFunc is not yet supported on lists or sets
-	if !s.isArrayProperty() && !s.isObjectProperty() && !s.isSetOfObjectsProperty() {
+	if !s.isArrayProperty() && !s.isObjectProperty() && !s.isSetProperty() {
 		terraformSchema.ValidateDiagFunc = s.validateDiagFunc()
 	}
 
