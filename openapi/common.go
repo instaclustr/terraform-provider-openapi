@@ -273,7 +273,7 @@ func convertPayloadToLocalStateDataValue(property *SpecSchemaDefinitionProperty,
 			//		localStateSetItem = localStateSetValue[setIdx]
 			//	}
 			//	objectValue, err := convertObjectToLocalStateData(property, setItem, localStateSetItem)
-			//	if err != nil {
+			//	if err != nil {s
 			//		return err, nil
 			//	}
 			//	setInput = append(setInput, objectValue)
