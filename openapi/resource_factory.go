@@ -83,7 +83,7 @@ func (r resourceFactory) createTerraformResourceSchema() (map[string]*schema.Sch
 	if err != nil {
 		return nil, err
 	}
-	log.Printf("[DEBUG] resource '%s' schemaDefinition: %s", r.openAPIResource.GetResourceName(), sPrettyPrint(schemaDefinition))
+	log.Printf("[DEBUG] resource1 '%s' schemaDefinition: %s", r.openAPIResource.GetResourceName(), sPrettyPrint(schemaDefinition))
 	return schemaDefinition.createResourceSchema()
 }
 
