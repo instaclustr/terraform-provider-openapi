@@ -281,6 +281,7 @@ func (p providerFactory) configureProvider(openAPIBackendConfiguration SpecBacke
 		}
 		return openAPIClient, nil
 	}
+
 }
 
 // GetTelemetryHandler returns a handler containing validated telemetry providers
