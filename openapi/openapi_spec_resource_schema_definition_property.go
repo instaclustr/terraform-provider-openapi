@@ -108,12 +108,20 @@ func (s *SpecSchemaDefinitionProperty) isArrayProperty() bool {
 	return s.Type == TypeList
 }
 
+func (s *SpecSchemaDefinitionProperty) isSetProperty() bool {
+	return s.Type == TypeSet
+}
+
 func (s *SpecSchemaDefinitionProperty) shouldIgnoreOrder() bool {
 	return s.Type == TypeList && s.IgnoreItemsOrder
 }
 
 func (s *SpecSchemaDefinitionProperty) isArrayOfObjectsProperty() bool {
 	return s.Type == TypeList && s.ArrayItemsType == TypeObject
+}
+
+func (s *SpecSchemaDefinitionProperty) isSetOfObjectsProperty() bool {
+	return s.Type == TypeSet && s.SetItemsType == TypeObject
 }
 
 func (s *SpecSchemaDefinitionProperty) isReadOnly() bool {
@@ -189,8 +197,22 @@ func (s *SpecSchemaDefinitionProperty) isTerraformListOfSimpleValues() (bool, *s
 	return false, nil
 }
 
+func (s *SpecSchemaDefinitionProperty) isTerraformSetOfSimpleValues() (bool, *schema.Schema) {
+	switch s.SetItemsType {
+	case TypeString:
+		return true, &schema.Schema{Type: schema.TypeString}
+	case TypeInt:
+		return true, &schema.Schema{Type: schema.TypeInt}
+	case TypeFloat:
+		return true, &schema.Schema{Type: schema.TypeFloat}
+	case TypeBool:
+		return true, &schema.Schema{Type: schema.TypeBool}
+	}
+	return false, nil
+}
+
 func (s *SpecSchemaDefinitionProperty) terraformObjectSchema() (*schema.Resource, error) {
-	if s.Type == TypeObject || (s.Type == TypeList && s.ArrayItemsType == TypeObject) {
+	if s.Type == TypeObject || (s.Type == TypeList && s.ArrayItemsType == TypeObject) || (s.Type == TypeSet && s.ArrayItemsType == TypeObject) {
 		if s.SpecSchemaDefinition == nil {
 			return nil, fmt.Errorf("missing spec schema definition for property '%s' of type '%s'", s.Name, s.Type)
 		}
@@ -261,6 +283,17 @@ func (s *SpecSchemaDefinitionProperty) terraformSchema() (*schema.Schema, error)
 			}
 			terraformSchema.Elem = objectSchema
 		}
+
+	case TypeSet:
+		if isSetOfPrimitives, elemSchema := s.isTerraformSetOfSimpleValues(); isSetOfPrimitives {
+			terraformSchema.Elem = elemSchema
+		} else {
+			objectSchema, err := s.terraformObjectSchema()
+			if err != nil {
+				return nil, err
+			}
+			terraformSchema.Elem = objectSchema
+		}
 	}
 
 	// A computed property could be one of:
@@ -284,7 +317,7 @@ func (s *SpecSchemaDefinitionProperty) terraformSchema() (*schema.Schema, error)
 	}
 
 	// ValidateFunc is not yet supported on lists or sets
-	if !s.isArrayProperty() && !s.isObjectProperty() {
+	if !s.isArrayProperty() && !s.isObjectProperty() && !s.isSetProperty() {
 		terraformSchema.ValidateDiagFunc = s.validateDiagFunc()
 	}
 
@@ -294,6 +327,9 @@ func (s *SpecSchemaDefinitionProperty) terraformSchema() (*schema.Schema, error)
 	if !s.isComputed() {
 		// Terraform does not allow defaults to be set on type list properties, an error (Default is not valid for lists) would be thrown otherwise (https://www.terraform.io/docs/extend/schemas/schema-behaviors.html#default)
 		if !s.isArrayProperty() {
+			terraformSchema.Default = s.Default
+		}
+		if !s.isSetProperty() {
 			terraformSchema.Default = s.Default
 		}
 	}
