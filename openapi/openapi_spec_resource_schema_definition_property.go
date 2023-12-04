@@ -179,6 +179,8 @@ func (s *SpecSchemaDefinitionProperty) terraformType() (schema.ValueType, error)
 		return schema.TypeBool, nil
 	case TypeObject, TypeList:
 		return schema.TypeList, nil
+	case TypeSet:
+		return schema.TypeSet, nil
 	}
 	return schema.TypeInvalid, fmt.Errorf("non supported type %s", s.Type)
 }
