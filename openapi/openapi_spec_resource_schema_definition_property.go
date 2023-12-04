@@ -214,7 +214,7 @@ func (s *SpecSchemaDefinitionProperty) isTerraformSetOfSimpleValues() (bool, *sc
 }
 
 func (s *SpecSchemaDefinitionProperty) terraformObjectSchema() (*schema.Resource, error) {
-	if s.Type == TypeObject || (s.Type == TypeList && s.ArrayItemsType == TypeObject) || (s.Type == TypeSet && s.ArrayItemsType == TypeObject) {
+	if s.Type == TypeObject || (s.Type == TypeList && s.ArrayItemsType == TypeObject) || (s.Type == TypeSet && s.SetItemsType == TypeObject) {
 		if s.SpecSchemaDefinition == nil {
 			return nil, fmt.Errorf("missing spec schema definition for property '%s' of type '%s'", s.Name, s.Type)
 		}
