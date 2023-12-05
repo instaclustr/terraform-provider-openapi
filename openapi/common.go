@@ -264,7 +264,7 @@ func convertPayloadToLocalStateDataValue(property *SpecSchemaDefinitionProperty,
 			log.Printf("[INFO] localStateSetValue: %s", localStateSetValue.List())
 
 			if propertyLocalStateValue != nil {
-				localStateSetValue, ok = propertyLocalStateValue.(*schema.Set)
+				localStateSetValue = propertyLocalStateValue.(*schema.Set)
 			}
 
 			for arrayIdx := 0; arrayIdx < intMax(len(arrayValue), len(localStateArrayValue)); arrayIdx++ {
