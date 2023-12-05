@@ -198,11 +198,14 @@ func convertPayloadToLocalStateDataValue(property *SpecSchemaDefinitionProperty,
 	if property.WriteOnly {
 		return propertyLocalStateValue, nil
 	}
-
+	log.Printf("[INFO] propertyValue: %s", propertyValue)
+	log.Printf("[INFO] propertyLocalStateValue: %s", propertyLocalStateValue)
 	switch property.Type {
 	case TypeObject:
+		log.Printf("[INFO] ofTypeObject")
 		return convertObjectToLocalStateData(property, propertyValue, propertyLocalStateValue)
 	case TypeList:
+		log.Printf("[INFO] ofTypeList")
 		if isListOfPrimitives, _ := property.isTerraformListOfSimpleValues(); isListOfPrimitives {
 			return propertyValue, nil
 		}
@@ -237,12 +240,78 @@ func convertPayloadToLocalStateDataValue(property *SpecSchemaDefinitionProperty,
 			return arrayInput, nil
 		}
 		return nil, fmt.Errorf("property '%s' is supposed to be an array objects", property.Name)
+	case TypeSet:
+		log.Printf("[INFO] ofTypeList")
+		if isListOfPrimitives, _ := property.isTerraformListOfSimpleValues(); isListOfPrimitives {
+			return propertyValue, nil
+		}
+		if property.isArrayOfObjectsProperty() {
+			arrayInput := []interface{}{}
+
+			arrayValue := make([]interface{}, 0)
+			if propertyValue != nil {
+				arrayValue = propertyValue.([]interface{})
+			}
+
+			localStateArrayValue := make([]interface{}, 0)
+			if propertyLocalStateValue != nil {
+				localStateArrayValue = propertyLocalStateValue.([]interface{})
+			}
+
+			for arrayIdx := 0; arrayIdx < intMax(len(arrayValue), len(localStateArrayValue)); arrayIdx++ {
+				var arrayItem interface{} = nil
+				if arrayIdx < len(arrayValue) {
+					arrayItem = arrayValue[arrayIdx]
+				}
+				var localStateArrayItem interface{} = nil
+				if arrayIdx < len(localStateArrayValue) {
+					localStateArrayItem = localStateArrayValue[arrayIdx]
+				}
+				objectValue, err := convertObjectToLocalStateData(property, arrayItem, localStateArrayItem)
+				if err != nil {
+					return err, nil
+				}
+				arrayInput = append(arrayInput, objectValue)
+			}
+			return arrayInput, nil
+		}
+		return nil, fmt.Errorf("property '%s' is supposed to be an array objects", property.Name)
+	//case TypeSet:
+	//	if isSetOfPrimitives, _ := property.isTerraformListOfSimpleValues(); isSetOfPrimitives {
+	//		return propertyValue, nil
+	//	}
+	//	if property.isSetOfObjectsProperty() {
+	//		setInput := make(map[string]struct{})
+	//
+	//		setValue := make(map[string]struct{})
+	//		if propertyValue != nil {
+	//			setValue = propertyValue.(map[string]struct{})
+	//		}
+	//
+	//		localStateSetValue := make(map[string]struct{})
+	//		if propertyLocalStateValue != nil {
+	//			localStateSetValue = propertyLocalStateValue.(map[string]struct{})
+	//		}
+	//		for item := range setValue {
+	//			value, err := convertObjectToLocalStateData(property, item, nil)
+	//			value = value.(map[string]struct{})
+	//			if err != nil {
+	//				// Handle the error
+	//				log.Fatal(err)
+	//			}
+	//			setInput[value] = struct{}{}
+	//		}
+	//		return setInput, nil
+	//	}
+	//	return nil, fmt.Errorf("property '%s' is supposed to be an set objects", property.Name)
 	case TypeString:
+		log.Printf("[INFO] ofTypeString")
 		if propertyValue == nil {
 			return nil, nil
 		}
 		return propertyValue.(string), nil
 	case TypeInt:
+		log.Printf("[INFO] ofTypeInt")
 		if propertyValue == nil {
 			return nil, nil
 		}
@@ -252,11 +321,13 @@ func convertPayloadToLocalStateDataValue(property *SpecSchemaDefinitionProperty,
 		}
 		return int(propertyValue.(float64)), nil
 	case TypeFloat:
+		log.Printf("[INFO] ofTypeFloat")
 		if propertyValue == nil {
 			return nil, nil
 		}
 		return propertyValue.(float64), nil
 	case TypeBool:
+		log.Printf("[INFO] ofTypeBool")
 		if propertyValue == nil {
 			return nil, nil
 		}
