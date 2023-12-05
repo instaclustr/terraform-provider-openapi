@@ -241,7 +241,7 @@ func convertPayloadToLocalStateDataValue(property *SpecSchemaDefinitionProperty,
 		}
 		return nil, fmt.Errorf("property '%s' is supposed to be an array objects", property.Name)
 	case TypeSet:
-		log.Printf("[INFO] ofTypeList")
+		log.Printf("[INFO] ofTypeSet")
 		if isListOfPrimitives, _ := property.isTerraformListOfSimpleValues(); isListOfPrimitives {
 			return propertyValue, nil
 		}
