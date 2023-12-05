@@ -271,11 +271,11 @@ func convertPayloadToLocalStateDataValue(property *SpecSchemaDefinitionProperty,
 				if err != nil {
 					return err, nil
 				}
-				setInput = append(arrayInput, objectValue)
+				setInput = append(setInput, objectValue)
 			}
-			return arrayInput, nil
+			return setInput, nil
 		}
-		return nil, fmt.Errorf("property '%s' is supposed to be an array objects", property.Name)
+		return nil, fmt.Errorf("property '%s' is supposed to be an set objects", property.Name)
 	case TypeString:
 		log.Printf("[INFO] ofTypeString")
 		if propertyValue == nil {
