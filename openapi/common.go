@@ -198,8 +198,8 @@ func convertPayloadToLocalStateDataValue(property *SpecSchemaDefinitionProperty,
 	if property.WriteOnly {
 		return propertyLocalStateValue, nil
 	}
-	log.Printf("[INFO] propertyValue: %s", propertyValue)
-	log.Printf("[INFO] propertyLocalStateValue: %s", propertyLocalStateValue)
+	log.Printf("[INFO] propertyValue: %s %s", reflect.TypeOf(propertyValue), reflect.TypeOf(propertyValue).Kind(), propertyValue)
+	log.Printf("[INFO] propertyLocalStateValue: %s", reflect.TypeOf(propertyLocalStateValue), reflect.TypeOf(propertyLocalStateValue).Kind(), propertyLocalStateValue)
 	switch property.Type {
 	case TypeObject:
 		log.Printf("[INFO] ofTypeObject")
@@ -242,11 +242,11 @@ func convertPayloadToLocalStateDataValue(property *SpecSchemaDefinitionProperty,
 		return nil, fmt.Errorf("property '%s' is supposed to be an array objects", property.Name)
 	case TypeSet:
 		log.Printf("[INFO] ofTypeSet")
-		if isListOfPrimitives, _ := property.isTerraformListOfSimpleValues(); isListOfPrimitives {
+		if isSetOfPrimitives, _ := property.isTerraformSetOfSimpleValues(); isSetOfPrimitives {
 			return propertyValue, nil
 		}
-		if property.isArrayOfObjectsProperty() {
-			arrayInput := []interface{}{}
+		if property.isSetOfObjectsProperty() {
+			setInput := []interface{}{}
 
 			arrayValue := make([]interface{}, 0)
 			if propertyValue != nil {
@@ -271,39 +271,11 @@ func convertPayloadToLocalStateDataValue(property *SpecSchemaDefinitionProperty,
 				if err != nil {
 					return err, nil
 				}
-				arrayInput = append(arrayInput, objectValue)
+				setInput = append(arrayInput, objectValue)
 			}
 			return arrayInput, nil
 		}
 		return nil, fmt.Errorf("property '%s' is supposed to be an array objects", property.Name)
-	//case TypeSet:
-	//	if isSetOfPrimitives, _ := property.isTerraformListOfSimpleValues(); isSetOfPrimitives {
-	//		return propertyValue, nil
-	//	}
-	//	if property.isSetOfObjectsProperty() {
-	//		setInput := make(map[string]struct{})
-	//
-	//		setValue := make(map[string]struct{})
-	//		if propertyValue != nil {
-	//			setValue = propertyValue.(map[string]struct{})
-	//		}
-	//
-	//		localStateSetValue := make(map[string]struct{})
-	//		if propertyLocalStateValue != nil {
-	//			localStateSetValue = propertyLocalStateValue.(map[string]struct{})
-	//		}
-	//		for item := range setValue {
-	//			value, err := convertObjectToLocalStateData(property, item, nil)
-	//			value = value.(map[string]struct{})
-	//			if err != nil {
-	//				// Handle the error
-	//				log.Fatal(err)
-	//			}
-	//			setInput[value] = struct{}{}
-	//		}
-	//		return setInput, nil
-	//	}
-	//	return nil, fmt.Errorf("property '%s' is supposed to be an set objects", property.Name)
 	case TypeString:
 		log.Printf("[INFO] ofTypeString")
 		if propertyValue == nil {
