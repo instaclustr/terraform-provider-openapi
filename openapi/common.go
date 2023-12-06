@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/hashicorp/terraform-plugin-sdk/helper/hashcode"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"io/ioutil"
 	"log"
@@ -193,13 +194,25 @@ func processIgnoreOrderIfEnabled(property SpecSchemaDefinitionProperty, inputPro
 	}
 	return remoteValue
 }
+func hashByName(v interface{}) int {
+	m, ok := v.(map[string]interface{})
+	if !ok {
+		// Handle error: v is not a map[string]interface{}
+	}
 
+	name, ok := m["name"].(string)
+	if !ok {
+		// Handle error: name field is not a string or does not exist
+	}
+
+	return hashcode.String(name)
+}
 func convertPayloadToLocalStateDataValue(property *SpecSchemaDefinitionProperty, propertyValue interface{}, propertyLocalStateValue interface{}) (interface{}, error) {
 	if property.WriteOnly {
 		return propertyLocalStateValue, nil
 	}
-	log.Printf("[INFO] propertyValue: %s %s", reflect.TypeOf(propertyValue), reflect.TypeOf(propertyValue).Kind(), propertyValue)
-	log.Printf("[INFO] propertyLocalStateValue: %s", reflect.TypeOf(propertyLocalStateValue), reflect.TypeOf(propertyLocalStateValue).Kind(), propertyLocalStateValue)
+	log.Printf("[INFO] propertyValue: %s %s %s", reflect.TypeOf(propertyValue), reflect.TypeOf(propertyValue).Kind(), propertyValue)
+	log.Printf("[INFO] propertyLocalStateValue: %s %s %s", reflect.TypeOf(propertyLocalStateValue), reflect.TypeOf(propertyLocalStateValue).Kind(), propertyLocalStateValue)
 	switch property.Type {
 	case TypeObject:
 		log.Printf("[INFO] ofTypeObject")
@@ -252,7 +265,7 @@ func convertPayloadToLocalStateDataValue(property *SpecSchemaDefinitionProperty,
 			if propertyValue != nil {
 				arrayValue = propertyValue.([]interface{})
 			}
-			setValue := schema.NewSet(schema.HashString, arrayValue)
+			setValue := schema.NewSet(hashByName, arrayValue)
 			log.Printf("[INFO] setValue: %s", setValue.List())
 
 			localStateArrayValue := make([]interface{}, 0)
