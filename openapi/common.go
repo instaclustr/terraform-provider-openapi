@@ -211,8 +211,8 @@ func convertPayloadToLocalStateDataValue(property *SpecSchemaDefinitionProperty,
 	if property.WriteOnly {
 		return propertyLocalStateValue, nil
 	}
-	log.Printf("[INFO] propertyValue: %s %s %s", reflect.TypeOf(propertyValue), reflect.TypeOf(propertyValue).Kind(), propertyValue)
-	log.Printf("[INFO] propertyLocalStateValue: %s %s %s", reflect.TypeOf(propertyLocalStateValue), reflect.TypeOf(propertyLocalStateValue).Kind(), propertyLocalStateValue)
+	//log.Printf("[INFO] propertyValue: %s %s %s", reflect.TypeOf(propertyValue), reflect.TypeOf(propertyValue).Kind(), propertyValue)
+	//log.Printf("[INFO] propertyLocalStateValue: %s %s %s", reflect.TypeOf(propertyLocalStateValue), reflect.TypeOf(propertyLocalStateValue).Kind(), propertyLocalStateValue)
 	switch property.Type {
 	case TypeObject:
 		log.Printf("[INFO] ofTypeObject")
