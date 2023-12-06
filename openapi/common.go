@@ -268,17 +268,17 @@ func convertPayloadToLocalStateDataValue(property *SpecSchemaDefinitionProperty,
 			setValue := schema.NewSet(hashByName, arrayValue)
 			log.Printf("[INFO] setValue: %s", setValue.List())
 
-			localStateArrayValue := make([]interface{}, 0)
-			if propertyLocalStateValue != nil {
-				localStateArrayValue = propertyLocalStateValue.([]interface{})
-			}
+			//localStateArrayValue := make([]interface{}, 0)
+			//if propertyLocalStateValue != nil {
+			//	localStateArrayValue = propertyLocalStateValue.([]interface{})
+			//}
 
 			localStateSetValue := schema.NewSet(schema.HashString, []interface{}{})
-			log.Printf("[INFO] localStateSetValue: %s", localStateSetValue.List())
 
 			if propertyLocalStateValue != nil {
 				localStateSetValue = propertyLocalStateValue.(*schema.Set)
 			}
+			log.Printf("[INFO] localStateSetValue: %s", localStateSetValue.List())
 
 			for arrayIdx := 0; arrayIdx < intMax(len(arrayValue), len(localStateArrayValue)); arrayIdx++ {
 				var arrayItem interface{} = nil
