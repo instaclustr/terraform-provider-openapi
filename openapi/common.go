@@ -259,7 +259,7 @@ func convertPayloadToLocalStateDataValue(property *SpecSchemaDefinitionProperty,
 			return propertyValue, nil
 		}
 		if property.isSetOfObjectsProperty() {
-			setInput := []interface{}{}
+			setInput := schema.NewSet(hashByName, []interface{}{})
 
 			arrayValue := make([]interface{}, 0)
 			if propertyValue != nil {
@@ -273,28 +273,31 @@ func convertPayloadToLocalStateDataValue(property *SpecSchemaDefinitionProperty,
 			//	localStateArrayValue = propertyLocalStateValue.([]interface{})
 			//}
 
-			localStateSetValue := schema.NewSet(schema.HashString, []interface{}{})
+			localStateSetValue := schema.NewSet(hashByName, []interface{}{})
 
 			if propertyLocalStateValue != nil {
 				localStateSetValue = propertyLocalStateValue.(*schema.Set)
 			}
 			log.Printf("[INFO] localStateSetValue: %s", localStateSetValue.List())
-
-			//for arrayIdx := 0; arrayIdx < intMax(len(arrayValue), len(localStateArrayValue)); arrayIdx++ {
-			//	var arrayItem interface{} = nil
-			//	if arrayIdx < len(arrayValue) {
-			//		arrayItem = arrayValue[arrayIdx]
-			//	}
-			//	var localStateArrayItem interface{} = nil
-			//	if arrayIdx < len(localStateArrayValue) {
-			//		localStateArrayItem = localStateArrayValue[arrayIdx]
-			//	}
-			//	objectValue, err := convertObjectToLocalStateData(property, arrayItem, localStateArrayItem)
-			//	if err != nil {
-			//		return err, nil
-			//	}
-			//	setInput = append(setInput, objectValue)
-			//}
+			localStateLength := len(localStateSetValue.List())
+			remoteStateLength := len(localStateSetValue.List())
+			if localStateLength > remoteStateLength {
+				for _, localStateItem := range localStateSetValue.List() {
+					// elem is an interface{}, so you'll need to cast it to whatever type your set elements are
+					var remoteStateItem interface{} = nil
+					for _, remoteStateItem2 := range localStateSetValue.List() {
+						if remoteStateItem2.(map[string]interface{})["name"] == localStateItem.(map[string]interface{})["name"] {
+							remoteStateItem = remoteStateItem2
+							break
+						}
+					}
+					objectValue, err := convertObjectToLocalStateData(property, remoteStateItem, localStateItem)
+					if err != nil {
+						return err, nil
+					}
+					setInput.Add(objectValue)
+				}
+			}
 			return setInput, nil
 		}
 		return nil, fmt.Errorf("property '%s' is supposed to be an set objects", property.Name)
