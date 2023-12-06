@@ -280,21 +280,21 @@ func convertPayloadToLocalStateDataValue(property *SpecSchemaDefinitionProperty,
 			}
 			log.Printf("[INFO] localStateSetValue: %s", localStateSetValue.List())
 
-			for arrayIdx := 0; arrayIdx < intMax(len(arrayValue), len(localStateArrayValue)); arrayIdx++ {
-				var arrayItem interface{} = nil
-				if arrayIdx < len(arrayValue) {
-					arrayItem = arrayValue[arrayIdx]
-				}
-				var localStateArrayItem interface{} = nil
-				if arrayIdx < len(localStateArrayValue) {
-					localStateArrayItem = localStateArrayValue[arrayIdx]
-				}
-				objectValue, err := convertObjectToLocalStateData(property, arrayItem, localStateArrayItem)
-				if err != nil {
-					return err, nil
-				}
-				setInput = append(setInput, objectValue)
-			}
+			//for arrayIdx := 0; arrayIdx < intMax(len(arrayValue), len(localStateArrayValue)); arrayIdx++ {
+			//	var arrayItem interface{} = nil
+			//	if arrayIdx < len(arrayValue) {
+			//		arrayItem = arrayValue[arrayIdx]
+			//	}
+			//	var localStateArrayItem interface{} = nil
+			//	if arrayIdx < len(localStateArrayValue) {
+			//		localStateArrayItem = localStateArrayValue[arrayIdx]
+			//	}
+			//	objectValue, err := convertObjectToLocalStateData(property, arrayItem, localStateArrayItem)
+			//	if err != nil {
+			//		return err, nil
+			//	}
+			//	setInput = append(setInput, objectValue)
+			//}
 			return setInput, nil
 		}
 		return nil, fmt.Errorf("property '%s' is supposed to be an set objects", property.Name)
