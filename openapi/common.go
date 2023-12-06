@@ -280,14 +280,31 @@ func convertPayloadToLocalStateDataValue(property *SpecSchemaDefinitionProperty,
 			}
 			log.Printf("[INFO] localStateSetValue: %s", localStateSetValue.List())
 			localStateLength := len(localStateSetValue.List())
-			remoteStateLength := len(localStateSetValue.List())
-			if localStateLength > remoteStateLength {
+			remoteStateLength := len(setValue.List())
+			if localStateLength >= remoteStateLength {
 				for _, localStateItem := range localStateSetValue.List() {
 					// elem is an interface{}, so you'll need to cast it to whatever type your set elements are
 					var remoteStateItem interface{} = nil
-					for _, remoteStateItem2 := range localStateSetValue.List() {
+					for _, remoteStateItem2 := range setValue.List() {
 						if remoteStateItem2.(map[string]interface{})["name"] == localStateItem.(map[string]interface{})["name"] {
 							remoteStateItem = remoteStateItem2
+							break
+						}
+					}
+					objectValue, err := convertObjectToLocalStateData(property, remoteStateItem, localStateItem)
+					if err != nil {
+						return err, nil
+					}
+					setInput.Add(objectValue)
+				}
+			}
+			if localStateLength < remoteStateLength {
+				for _, remoteStateItem := range setValue.List() {
+					// elem is an interface{}, so you'll need to cast it to whatever type your set elements are
+					var localStateItem interface{} = nil
+					for _, localStateItem2 := range localStateSetValue.List() {
+						if localStateItem2.(map[string]interface{})["name"] == remoteStateItem.(map[string]interface{})["name"] {
+							remoteStateItem = localStateItem2
 							break
 						}
 					}
