@@ -555,6 +555,7 @@ func (r resourceFactory) populatePayload(input map[string]interface{}, property 
 		return nil
 	}
 	dataValueKind := reflect.TypeOf(dataValue).Kind()
+	log.Printf("[INFO] dataValueKind %s", dataValueKind)
 	switch dataValueKind {
 	case reflect.Map:
 		objectInput := map[string]interface{}{}
@@ -600,6 +601,7 @@ func (r resourceFactory) populatePayload(input map[string]interface{}, property 
 				input[property.Name] = arrayInput
 			}
 		}
+	case reflect.Set
 	case reflect.String:
 		input[property.Name] = dataValue.(string)
 	case reflect.Int:
