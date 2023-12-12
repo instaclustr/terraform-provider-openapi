@@ -147,6 +147,7 @@ func (r resourceFactory) readWithOptions(data *schema.ResourceData, i interface{
 	}
 
 	remoteData, err := r.readRemote(data.Id(), openAPIClient, parentsIDs...)
+	log.Printf("[INFO] remoteData: %s", remoteData)
 
 	if err != nil {
 		if openapiErr, ok := err.(openapierr.Error); ok {
