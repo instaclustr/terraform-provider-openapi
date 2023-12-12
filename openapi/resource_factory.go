@@ -601,7 +601,6 @@ func (r resourceFactory) populatePayload(input map[string]interface{}, property 
 				input[property.Name] = arrayInput
 			}
 		}
-	case reflect.Set
 	case reflect.String:
 		input[property.Name] = dataValue.(string)
 	case reflect.Int:
