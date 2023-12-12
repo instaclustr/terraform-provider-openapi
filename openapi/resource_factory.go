@@ -128,6 +128,9 @@ func (r resourceFactory) create(data *schema.ResourceData, i interface{}) error 
 	return updateStateWithPayloadData(r.openAPIResource, responsePayload, data)
 }
 
+// dc.length=5
+// dc.length=6
+// remote state, terraform.state, terraform configuraion
 func (r resourceFactory) readWithOptions(data *schema.ResourceData, i interface{}, handleNotFoundErr bool) error {
 	openAPIClient := i.(ClientOpenAPI)
 

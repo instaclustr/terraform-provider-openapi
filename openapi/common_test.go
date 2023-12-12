@@ -720,13 +720,66 @@ func TestConvertPayloadToLocalStateDataValue(t *testing.T) {
 				So(resultValue.([]interface{})[0].(map[string]interface{})["example_float"].(float64), ShouldEqual, objectDefault["example_float"])
 			})
 		})
+		Convey("When convertPayloadToLocalStateDataValue is called with a set property and with items object", func() {
+			objectSchemaDefinition := &SpecSchemaDefinition{
+				Properties: SpecSchemaDefinitionProperties{
+					newIntSchemaDefinitionPropertyWithDefaults("example_int", "", true, false, nil),
+					newStringSchemaDefinitionPropertyWithDefaults("example_string", "", true, false, nil),
+					newBoolSchemaDefinitionPropertyWithDefaults("example_bool", "", true, false, nil),
+					newNumberSchemaDefinitionPropertyWithDefaults("example_float", "", true, false, nil),
+				},
+			}
+			objectDefault := map[string]interface{}{
+				"example_int":    80,
+				"example_string": "http",
+				"example_bool":   true,
+				"example_float":  10.45,
+			}
+			property := newSetSchemaDefinitionPropertyWithDefaults("slice_object_property", "", true, false, false, nil, TypeObject, objectSchemaDefinition)
+			dataValue := []interface{}{objectDefault}
+			resultValue, err := convertPayloadToLocalStateDataValue(property, dataValue, nil)
+			Convey("Then the error should be nil and the result value should be the list containing the object items with the expected types (int, string, bool and float)", func() {
+				So(err, ShouldBeNil)
+				So(resultValue.(*schema.Set).List()[0].(map[string]interface{}), ShouldContainKey, "example_int")
+				So(resultValue.(*schema.Set).List()[0].(map[string]interface{})["example_int"].(int), ShouldEqual, objectDefault["example_int"])
+				So(resultValue.(*schema.Set).List()[0].(map[string]interface{}), ShouldContainKey, "example_string")
+				So(resultValue.(*schema.Set).List()[0].(map[string]interface{})["example_string"].(string), ShouldEqual, objectDefault["example_string"])
+				So(resultValue.(*schema.Set).List()[0].(map[string]interface{}), ShouldContainKey, "example_bool")
+				So(resultValue.(*schema.Set).List()[0].(map[string]interface{})["example_bool"].(bool), ShouldEqual, objectDefault["example_bool"])
+				So(resultValue.(*schema.Set).List()[0].(map[string]interface{}), ShouldContainKey, "example_float")
+				So(resultValue.(*schema.Set).List()[0].(map[string]interface{})["example_float"].(float64), ShouldEqual, objectDefault["example_float"])
+			})
+		})
 		Convey("When convertPayloadToLocalStateDataValue is called with a list property and an array with items string value", func() {
 			property := newListSchemaDefinitionPropertyWithDefaults("slice_object_property", "", true, false, false, nil, TypeString, nil)
-			dataValue := []interface{}{"value1"}
+			dataValue := []interface{}{"value2", "value1"}
 			resultValue, err := convertPayloadToLocalStateDataValue(property, dataValue, nil)
 			Convey("Then the error should be nil and the result value should be the expected value with the right type array", func() {
 				So(err, ShouldBeNil)
 				So(resultValue.([]interface{}), ShouldContain, dataValue[0])
+				So(resultValue.([]interface{}), ShouldContain, dataValue[1])
+			})
+		})
+		Convey("When convertPayloadToLocalStateDataValue is called with a set property and an set with items string value", func() {
+			property := newSetSchemaDefinitionPropertyWithDefaults("set_object_property", "", true, false, false, nil, TypeString, nil)
+			dataValue := []interface{}{"value2", "value1"}
+			resultValue, err := convertPayloadToLocalStateDataValue(property, dataValue, nil)
+			Convey("Then the error should be nil and the result value should be the expected value with the right type array", func() {
+				So(err, ShouldBeNil)
+				So(resultValue.([]interface{}), ShouldContain, dataValue[0])
+				So(resultValue.([]interface{}), ShouldContain, dataValue[1])
+			})
+		})
+		Convey("When convertPayloadToLocalStateDataValue is called with a set property and an set with items string remote value and a set of items string local value", func() {
+			property := newSetSchemaDefinitionPropertyWithDefaults("set_object_property", "", true, false, false, nil, TypeString, nil)
+			dataValue := []interface{}{"value2", "value1", "value4"}
+			localDataValue := schema.NewSet(schema.HashString, []interface{}{"value1", "value2", "value3"})
+			resultValue, err := convertPayloadToLocalStateDataValue(property, dataValue, localDataValue)
+			Convey("Then the error should be nil and the result value should be the expected value with the right type array", func() {
+				So(err, ShouldBeNil)
+				So(resultValue.([]interface{}), ShouldContain, dataValue[0])
+				So(resultValue.([]interface{}), ShouldContain, dataValue[1])
+				So(resultValue.([]interface{}), ShouldContain, dataValue[2])
 			})
 		})
 
@@ -914,6 +967,118 @@ func TestConvertPayloadToLocalStateDataValue(t *testing.T) {
 
 			Convey("When the local state is empty", func() {
 				resultValue, err := convertPayloadToLocalStateDataValue(propertyWithNestedObject, dataValue, nil)
+
+				Convey("Then the result returned should be the expected one", func() {
+					So(err, ShouldBeNil)
+
+					nestedObject := resultValue.([]interface{})[0].(map[string]interface{})["nested_object"].([]interface{})[0].(map[string]interface{})
+					So(nestedObject["origin_port"], ShouldBeNil)
+					So(nestedObject["protocol"], ShouldEqual, "tcp")
+					So(nestedObject["password"], ShouldBeNil)
+					So(nestedObject["password_array"], ShouldBeNil)
+
+					firstNestedListItem := nestedObject["nested_list"].([]interface{})[0].(map[string]interface{})
+					So(firstNestedListItem["nested_list_property"], ShouldEqual, 123)
+					So(firstNestedListItem["nested_list_property_password"], ShouldBeNil)
+				})
+			})
+
+			Convey("When the local state is populated", func() {
+				localStateValue := map[string]interface{}{
+					"id": propertyWithNestedObjectSchemaDefinition.Properties[0].Default,
+					"nested_object": map[string]interface{}{
+						"origin_port":    1111,
+						"protocol":       "tcp",
+						"password":       "secret",
+						"password_array": []interface{}{"secret1", "secret2"},
+						"nested_list": []interface{}{
+							map[string]interface{}{
+								"nested_list_property":          555,
+								"nested_list_property_password": "local secret value",
+							},
+						},
+					},
+				}
+				resultValue, err := convertPayloadToLocalStateDataValue(propertyWithNestedObject, dataValue, localStateValue)
+
+				Convey("Then the result returned should be the expected one", func() {
+					So(err, ShouldBeNil)
+
+					nestedObject := resultValue.([]interface{})[0].(map[string]interface{})["nested_object"].([]interface{})[0].(map[string]interface{})
+					So(nestedObject["origin_port"], ShouldEqual, 1111)
+					So(nestedObject["protocol"], ShouldEqual, "tcp")
+					So(nestedObject["password"], ShouldEqual, "secret")
+					So(len(nestedObject["password_array"].([]interface{})), ShouldEqual, 2)
+
+					passwordArray := nestedObject["password_array"].([]interface{})
+					So(passwordArray[0], ShouldEqual, "secret1")
+					So(passwordArray[1], ShouldEqual, "secret2")
+
+					So(len(nestedObject["nested_list"].([]interface{})), ShouldEqual, 1)
+					nestedListItem := nestedObject["nested_list"].([]interface{})[0].(map[string]interface{})
+					So(nestedListItem["nested_list_property"], ShouldEqual, 123)
+					So(nestedListItem["nested_list_property_password"], ShouldEqual, "local secret value")
+				})
+			})
+		})
+		Convey("When convertPayloadToLocalStateDataValue is called with set of complex objects with write-only properties", func() {
+			nestedArrayItemSchemaDefinition := &SpecSchemaDefinition{
+				Properties: SpecSchemaDefinitionProperties{
+					newIntSchemaDefinitionPropertyWithDefaults("nested_list_property", "", true, false, 456),
+					setSchemaDefinitionPropertyWriteOnly(newIntSchemaDefinitionPropertyWithDefaults("nested_list_property_password", "", true, false, nil)),
+				},
+			}
+
+			nestedObjectSchemaDefinition := &SpecSchemaDefinition{
+				Properties: SpecSchemaDefinitionProperties{
+					setSchemaDefinitionPropertyWriteOnly(newIntSchemaDefinitionPropertyWithDefaults("origin_port", "", true, false, 80)),
+					newStringSchemaDefinitionPropertyWithDefaults("protocol", "", true, false, "http"),
+					setSchemaDefinitionPropertyWriteOnly(newStringSchemaDefinitionPropertyWithDefaults("password", "", true, false, nil)),
+					setSchemaDefinitionPropertyWriteOnly(newListSchemaDefinitionPropertyWithDefaults("password_array", "", true, false, false, nil, TypeString, nil)),
+					newListSchemaDefinitionPropertyWithDefaults("nested_list", "", true, false, false, nil, TypeObject, nestedArrayItemSchemaDefinition),
+				},
+			}
+			nestedObject := newObjectSchemaDefinitionPropertyWithDefaults("nested_object", "", true, false, false, nil, nestedObjectSchemaDefinition)
+			propertyWithNestedObjectSchemaDefinition := &SpecSchemaDefinition{
+				Properties: SpecSchemaDefinitionProperties{
+					idProperty,
+					nestedObject,
+				},
+			}
+			// The below represents the JSON representation of the response payload received by the API
+			dataValue1 := map[string]interface{}{
+				"id": propertyWithNestedObjectSchemaDefinition.Properties[0].Default,
+				"nested_object": map[string]interface{}{
+					"origin_port": 12345,
+					"protocol":    "tcp",
+					"nested_list": []interface{}{
+						map[string]interface{}{
+							"nested_list_property":          123,
+							"nested_list_property_password": "some changed value",
+						},
+					},
+				},
+			}
+			dataValue2 := map[string]interface{}{
+				"id": propertyWithNestedObjectSchemaDefinition.Properties[0].Default,
+				"nested_object": map[string]interface{}{
+					"origin_port": 12345,
+					"protocol":    "tcp",
+					"nested_list": []interface{}{
+						map[string]interface{}{
+							"nested_list_property":          123,
+							"nested_list_property_password": "some changed value",
+						},
+					},
+				},
+			}
+			dataValues := []interface{}{dataValue1, dataValue2}
+			expectedPropertyWithNestedObjectName := "property_with_nested_object"
+			propertyWithNestedObject := newObjectSchemaDefinitionPropertyWithDefaults(expectedPropertyWithNestedObjectName, "", true, false, false, dataValue1, propertyWithNestedObjectSchemaDefinition)
+			expectedPropertyWithSetWithNestedObjectName := "property_with_set_with_nested_object"
+			setPropertyWithNestedObject := newSetSchemaDefinitionPropertyWithDefaults(expectedPropertyWithSetWithNestedObjectName, "", true, false, false, nil, TypeString, nestedObjectSchemaDefinition)
+			Convey("When the local state is empty", func() {
+				resultValue, err := convertPayloadToLocalStateDataValue(setPropertyWithNestedObject, dataValues, nil)
 
 				Convey("Then the result returned should be the expected one", func() {
 					So(err, ShouldBeNil)
