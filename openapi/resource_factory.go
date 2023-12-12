@@ -601,6 +601,37 @@ func (r resourceFactory) populatePayload(input map[string]interface{}, property 
 				input[property.Name] = arrayInput
 			}
 		}
+	case reflect.Ptr:
+		if isSetOfPrimitives, _ := property.isTerraformSetOfSimpleValues(); isSetOfPrimitives {
+			input[property.Name] = dataValue.([]interface{})
+		} else {
+			// This is the work around put in place to have support for complex objects. In this case, because the
+			// state representation of nested objects is an array, we need to make sure we don't end up constructing an
+			// array but rather just a json object
+			if property.shouldUseLegacyTerraformSDKBlockApproachForComplexObjects() {
+				arrayValue := dataValue.([]interface{})
+				if len(arrayValue) != 1 {
+					return fmt.Errorf("something is really wrong here...an object property with nested objects should have exactly one elem in the terraform state list")
+				}
+				if err := r.populatePayload(input, property, arrayValue[0]); err != nil {
+					return err
+				}
+			} else {
+				setInput := schema.NewSet(hashByName, []interface{}{})
+				arrayValue := dataValue.([]interface{})
+				for _, arrayItem := range arrayValue {
+					objectInput := map[string]interface{}{}
+					if err := r.populatePayload(objectInput, property, arrayItem); err != nil {
+						return err
+					}
+					// Only assign the value of the object, otherwise a dup key will be assigned which will cause problems. Example
+					// [propertyName: listeners; propertyValue: [map[options:[] origin_ingress_port:80 protocol:http shield_ingress_port:80]]]
+					// Here we just want to assign as value: map[options:[] origin_ingress_port:80 protocol:http shield_ingress_port:80]
+					setInput.Add(objectInput[property.Name])
+				}
+				input[property.Name] = setInput
+			}
+		}
 	case reflect.String:
 		input[property.Name] = dataValue.(string)
 	case reflect.Int:
