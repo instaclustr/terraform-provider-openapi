@@ -603,23 +603,23 @@ func (r resourceFactory) populatePayload(input map[string]interface{}, property 
 		}
 	case reflect.Ptr:
 		if isSetOfPrimitives, _ := property.isTerraformSetOfSimpleValues(); isSetOfPrimitives {
-			input[property.Name] = dataValue.([]interface{})
+			input[property.Name] = dataValue.(*schema.Set)
 		} else {
 			// This is the work around put in place to have support for complex objects. In this case, because the
 			// state representation of nested objects is an array, we need to make sure we don't end up constructing an
 			// array but rather just a json object
 			if property.shouldUseLegacyTerraformSDKBlockApproachForComplexObjects() {
-				arrayValue := dataValue.([]interface{})
-				if len(arrayValue) != 1 {
+				arrayValue := dataValue.(*schema.Set)
+				if len(arrayValue.List()) != 1 {
 					return fmt.Errorf("something is really wrong here...an object property with nested objects should have exactly one elem in the terraform state list")
 				}
-				if err := r.populatePayload(input, property, arrayValue[0]); err != nil {
+				if err := r.populatePayload(input, property, arrayValue.List()[0]); err != nil {
 					return err
 				}
 			} else {
 				setInput := schema.NewSet(hashByName, []interface{}{})
-				arrayValue := dataValue.([]interface{})
-				for _, arrayItem := range arrayValue {
+				setValue := dataValue.(*schema.Set)
+				for _, arrayItem := range setValue.List() {
 					objectInput := map[string]interface{}{}
 					if err := r.populatePayload(objectInput, property, arrayItem); err != nil {
 						return err
