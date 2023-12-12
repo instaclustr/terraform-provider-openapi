@@ -609,7 +609,7 @@ func (r resourceFactory) populatePayload(input map[string]interface{}, property 
 	case reflect.Bool:
 		input[property.Name] = dataValue.(bool)
 	default:
-		return fmt.Errorf("'%s' type not supported", property.Type)
+		return fmt.Errorf("'%s' type not supported in factory", property.Type)
 	}
 	return nil
 }
