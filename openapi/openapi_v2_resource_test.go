@@ -2865,6 +2865,42 @@ func TestGetPropertyType(t *testing.T) {
 				So(itemsPropType, ShouldEqual, TypeList)
 			})
 		})
+		Convey("When getPropertyType method is called with a property of type array and not x-terraform-ignore-order or x-ignore-order", func() {
+			expectedIgnoreOrder := false
+			property := spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Type: spec.StringOrArray{"array"},
+				},
+				VendorExtensible: spec.VendorExtensible{
+					Extensions: spec.Extensions{
+						extTfIgnoreOrder: expectedIgnoreOrder,
+					},
+				},
+			}
+			itemsPropType, err := r.getPropertyType(property)
+			Convey("Then the type of the items should match the expected set", func() {
+				So(err, ShouldBeNil)
+				So(itemsPropType, ShouldEqual, TypeList)
+			})
+		})
+		Convey("When getPropertyType method is called with a property of type array and x-terraform-ignore-order or x-ignore-order", func() {
+			expectedIgnoreOrder := true
+			property := spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Type: spec.StringOrArray{"array"},
+				},
+				VendorExtensible: spec.VendorExtensible{
+					Extensions: spec.Extensions{
+						extTfIgnoreOrder: expectedIgnoreOrder,
+					},
+				},
+			}
+			itemsPropType, err := r.getPropertyType(property)
+			Convey("Then the type of the items should match the expected set", func() {
+				So(err, ShouldBeNil)
+				So(itemsPropType, ShouldEqual, TypeSet)
+			})
+		})
 
 		Convey("When getPropertyType method is called with a property of type object", func() {
 			property := spec.Schema{
@@ -3175,6 +3211,43 @@ func TestResourceIsArrayProperty(t *testing.T) {
 				So(objectItemSchema, ShouldNotBeNil)
 				exists, _ := assertPropertyExists(objectItemSchema.Properties, "protocol")
 				So(exists, ShouldBeTrue)
+			})
+		})
+		Convey("When isArrayProperty is called with an array property type with terraform-ignore-order set", func() {
+			propertySchema := spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Type: spec.StringOrArray{"array"},
+					Items: &spec.SchemaOrArray{
+						Schema: &spec.Schema{
+							SchemaProps: spec.SchemaProps{
+								Type: spec.StringOrArray{"object"},
+								Properties: map[string]spec.Schema{
+									"prop1": {
+										SchemaProps: spec.SchemaProps{
+											Type: spec.StringOrArray{"string"},
+										},
+									},
+									"prop2": {
+										SchemaProps: spec.SchemaProps{
+											Type: spec.StringOrArray{"integer"},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+				VendorExtensible: spec.VendorExtensible{
+					Extensions: spec.Extensions{
+						extTfIgnoreOrder: true,
+					},
+				},
+			}
+			isArray, _, objectItemSchema, err := r.isArrayProperty(propertySchema)
+			Convey("Then the result returned should be the expected one", func() {
+				So(err, ShouldBeNil)
+				So(isArray, ShouldBeFalse)
+				So(objectItemSchema, ShouldBeNil)
 			})
 		})
 		Convey("When isArrayProperty is called with a NON array property type", func() {

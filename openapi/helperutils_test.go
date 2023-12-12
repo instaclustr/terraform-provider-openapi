@@ -96,9 +96,20 @@ func newListSchemaDefinitionPropertyWithDefaults(name, preferredName string, req
 	return newListSchemaDefinitionProperty(name, preferredName, required, readOnly, computed, false, false, false, false, false, defaultValue, itemsType, objectSpecSchemaDefinition)
 }
 
+func newSetSchemaDefinitionPropertyWithDefaults(name, preferredName string, required, readOnly, computed bool, defaultValue interface{}, itemsType schemaDefinitionPropertyType, objectSpecSchemaDefinition *SpecSchemaDefinition) *SpecSchemaDefinitionProperty {
+	return newSetSchemaDefinitionProperty(name, preferredName, required, readOnly, computed, false, false, false, false, false, defaultValue, itemsType, objectSpecSchemaDefinition)
+}
+
 func newListSchemaDefinitionProperty(name, preferredName string, required, readOnly, forceNew, computed, sensitive, immutable, isIdentifier, isStatusIdentifier bool, defaultValue interface{}, itemsType schemaDefinitionPropertyType, objectSpecSchemaDefinition *SpecSchemaDefinition) *SpecSchemaDefinitionProperty {
 	schemaDefProperty := newSchemaDefinitionProperty(name, preferredName, TypeList, required, readOnly, computed, forceNew, sensitive, immutable, isIdentifier, isStatusIdentifier, defaultValue)
 	schemaDefProperty.ArrayItemsType = itemsType
+	schemaDefProperty.SpecSchemaDefinition = objectSpecSchemaDefinition
+	return schemaDefProperty
+}
+
+func newSetSchemaDefinitionProperty(name, preferredName string, required, readOnly, forceNew, computed, sensitive, immutable, isIdentifier, isStatusIdentifier bool, defaultValue interface{}, itemsType schemaDefinitionPropertyType, objectSpecSchemaDefinition *SpecSchemaDefinition) *SpecSchemaDefinitionProperty {
+	schemaDefProperty := newSchemaDefinitionProperty(name, preferredName, TypeSet, required, readOnly, computed, forceNew, sensitive, immutable, isIdentifier, isStatusIdentifier, defaultValue)
+	schemaDefProperty.SetItemsType = itemsType
 	schemaDefProperty.SpecSchemaDefinition = objectSpecSchemaDefinition
 	return schemaDefProperty
 }

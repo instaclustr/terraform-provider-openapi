@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/hashicorp/terraform-plugin-sdk/helper/hashcode"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"io/ioutil"
 	"log"
@@ -193,16 +194,31 @@ func processIgnoreOrderIfEnabled(property SpecSchemaDefinitionProperty, inputPro
 	}
 	return remoteValue
 }
+func hashByName(v interface{}) int {
+	m, ok := v.(map[string]interface{})
+	if !ok {
+		// Handle error: v is not a map[string]interface{}
+	}
 
+	name, ok := m["name"].(string)
+	if !ok {
+		// Handle error: name field is not a string or does not exist
+	}
+
+	return hashcode.String(name)
+}
 func convertPayloadToLocalStateDataValue(property *SpecSchemaDefinitionProperty, propertyValue interface{}, propertyLocalStateValue interface{}) (interface{}, error) {
 	if property.WriteOnly {
 		return propertyLocalStateValue, nil
 	}
-
+	//log.Printf("[INFO] propertyValue: %s %s %s", reflect.TypeOf(propertyValue), reflect.TypeOf(propertyValue).Kind(), propertyValue)
+	//log.Printf("[INFO] propertyLocalStateValue: %s %s %s", reflect.TypeOf(propertyLocalStateValue), reflect.TypeOf(propertyLocalStateValue).Kind(), propertyLocalStateValue)
 	switch property.Type {
 	case TypeObject:
+		log.Printf("[INFO] ofTypeObject")
 		return convertObjectToLocalStateData(property, propertyValue, propertyLocalStateValue)
 	case TypeList:
+		log.Printf("[INFO] ofTypeList")
 		if isListOfPrimitives, _ := property.isTerraformListOfSimpleValues(); isListOfPrimitives {
 			return propertyValue, nil
 		}
@@ -237,12 +253,80 @@ func convertPayloadToLocalStateDataValue(property *SpecSchemaDefinitionProperty,
 			return arrayInput, nil
 		}
 		return nil, fmt.Errorf("property '%s' is supposed to be an array objects", property.Name)
+	case TypeSet:
+		log.Printf("[INFO] ofTypeSet")
+		if isSetOfPrimitives, _ := property.isTerraformSetOfSimpleValues(); isSetOfPrimitives {
+			return propertyValue, nil
+		}
+		if property.isSetOfObjectsProperty() {
+			setInput := schema.NewSet(hashByName, []interface{}{})
+
+			arrayValue := make([]interface{}, 0)
+			if propertyValue != nil {
+				arrayValue = propertyValue.([]interface{})
+			}
+			setValue := schema.NewSet(hashByName, arrayValue)
+			log.Printf("[INFO] setValue: %s", setValue.List())
+
+			//localStateArrayValue := make([]interface{}, 0)
+			//if propertyLocalStateValue != nil {
+			//	localStateArrayValue = propertyLocalStateValue.([]interface{})
+			//}
+
+			localStateSetValue := schema.NewSet(hashByName, []interface{}{})
+
+			if propertyLocalStateValue != nil {
+				localStateSetValue = propertyLocalStateValue.(*schema.Set)
+			}
+			log.Printf("[INFO] propertyLocalStateValue: %s", propertyLocalStateValue)
+			log.Printf("[INFO] localStateSetValue: %s", localStateSetValue.List())
+			localStateLength := len(localStateSetValue.List())
+			remoteStateLength := len(setValue.List())
+			if localStateLength >= remoteStateLength {
+				for _, localStateItem := range localStateSetValue.List() {
+					// elem is an interface{}, so you'll need to cast it to whatever type your set elements are
+					var remoteStateItem interface{} = nil
+					for _, remoteStateItem2 := range setValue.List() {
+						if remoteStateItem2.(map[string]interface{})["name"] == localStateItem.(map[string]interface{})["name"] {
+							remoteStateItem = remoteStateItem2
+							break
+						}
+					}
+					objectValue, err := convertObjectToLocalStateData(property, remoteStateItem, localStateItem)
+					if err != nil {
+						return err, nil
+					}
+					setInput.Add(objectValue)
+				}
+			}
+			if localStateLength < remoteStateLength {
+				for _, remoteStateItem := range setValue.List() {
+					// elem is an interface{}, so you'll need to cast it to whatever type your set elements are
+					var localStateItem interface{} = nil
+					for _, localStateItem2 := range localStateSetValue.List() {
+						if localStateItem2.(map[string]interface{})["name"] == remoteStateItem.(map[string]interface{})["name"] {
+							remoteStateItem = localStateItem2
+							break
+						}
+					}
+					objectValue, err := convertObjectToLocalStateData(property, remoteStateItem, localStateItem)
+					if err != nil {
+						return err, nil
+					}
+					setInput.Add(objectValue)
+				}
+			}
+			return setInput, nil
+		}
+		return nil, fmt.Errorf("property '%s' is supposed to be an set objects", property.Name)
 	case TypeString:
+		log.Printf("[INFO] ofTypeString")
 		if propertyValue == nil {
 			return nil, nil
 		}
 		return propertyValue.(string), nil
 	case TypeInt:
+		log.Printf("[INFO] ofTypeInt")
 		if propertyValue == nil {
 			return nil, nil
 		}
@@ -252,11 +336,13 @@ func convertPayloadToLocalStateDataValue(property *SpecSchemaDefinitionProperty,
 		}
 		return int(propertyValue.(float64)), nil
 	case TypeFloat:
+		log.Printf("[INFO] ofTypeFloat")
 		if propertyValue == nil {
 			return nil, nil
 		}
 		return propertyValue.(float64), nil
 	case TypeBool:
+		log.Printf("[INFO] ofTypeBool")
 		if propertyValue == nil {
 			return nil, nil
 		}
