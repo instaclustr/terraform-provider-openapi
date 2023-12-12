@@ -316,7 +316,7 @@ func convertPayloadToLocalStateDataValue(property *SpecSchemaDefinitionProperty,
 					setInput.Add(objectValue)
 				}
 			}
-			return setValue, nil
+			return setInput, nil
 		}
 		return nil, fmt.Errorf("property '%s' is supposed to be an set objects", property.Name)
 	case TypeString:
