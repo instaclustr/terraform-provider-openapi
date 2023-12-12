@@ -49,6 +49,7 @@ func (o *ProviderClient) Post(resource SpecResource, requestPayload interface{},
 		return nil, err
 	}
 	operation := resource.getResourceOperations().Post
+	log.Printf("[INFO] requestPayload: %s", requestPayload)
 	return o.performRequest(httpPost, resourceURL, operation, requestPayload, responsePayload)
 }
 
