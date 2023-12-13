@@ -298,6 +298,7 @@ func convertPayloadToLocalStateDataValue(property *SpecSchemaDefinitionProperty,
 			}
 			setValue := schema.NewSet(hashComplexObject, arrayValue)
 			log.Printf("[INFO] setValue: %s", setValue.List())
+			log.Printf("[INFO] properties: %s", property.String1())
 			log.Printf("[INFO] properties: %s", property.String())
 
 			localStateSetValue := schema.NewSet(hashComplexObject, []interface{}{})

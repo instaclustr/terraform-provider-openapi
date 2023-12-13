@@ -72,6 +72,11 @@ func (s *SpecSchemaDefinitionProperty) isPrimitiveProperty() bool {
 	return false
 }
 
+func (s *SpecSchemaDefinitionProperty) String1() string {
+	return fmt.Sprintf("Name: %s, Type: %s, Description: %s, Required: %v, ReadOnly: %v",
+		s.Name, s.Type, s.Description, s.Required, s.ReadOnly)
+}
+
 func (s *SpecSchemaDefinitionProperty) String() string {
 	var nestedProperties string
 	if s.SpecSchemaDefinition != nil {
@@ -79,8 +84,8 @@ func (s *SpecSchemaDefinitionProperty) String() string {
 			nestedProperties += prop.String() + ", "
 		}
 	}
-	return fmt.Sprintf("Name: %s, Type: %s, Description: %s, Required: %v, ReadOnly: %v, Nested: [%s]",
-		s.Name, s.Type, s.Description, s.Required, s.ReadOnly, nestedProperties)
+	return fmt.Sprintf("Name: %s, Type: %s, Required: %v, ReadOnly: %v, Nested: [%s]",
+		s.Name, s.Type, s.Required, s.ReadOnly, nestedProperties)
 }
 
 // GetTerraformCompliantPropertyName returns the property name converted to a terraform compliant name if needed following the snake_case naming convention
