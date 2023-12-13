@@ -1,6 +1,7 @@
 package openapi
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -10,6 +11,7 @@ import (
 	"log"
 	"net/http"
 	"reflect"
+	"sort"
 	"strconv"
 
 	"github.com/dikhan/terraform-provider-openapi/v3/openapi/openapierr"
@@ -207,6 +209,37 @@ func hashByName(v interface{}) int {
 
 	return hashcode.String(name)
 }
+
+func hashComplexObject(v interface{}) int {
+	var buffer bytes.Buffer
+
+	switch v := v.(type) {
+	case map[string]interface{}:
+		// Sort the keys so that the order is consistent
+		var keys []string
+		for k := range v {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+
+		// Hash each key-value pair
+		for _, k := range keys {
+			buffer.WriteString(k)
+			buffer.WriteString(fmt.Sprintf("%v", hashComplexObject(v[k])))
+		}
+	case []interface{}:
+		// Hash each element in the slice
+		for _, elem := range v {
+			buffer.WriteString(fmt.Sprintf("%v", hashComplexObject(elem)))
+		}
+	default:
+		// For primitive types, just write the value to the buffer
+		buffer.WriteString(fmt.Sprintf("%v", v))
+	}
+
+	// Compute and return the hash of the concatenated string
+	return hashcode.String(buffer.String())
+}
 func convertPayloadToLocalStateDataValue(property *SpecSchemaDefinitionProperty, propertyValue interface{}, propertyLocalStateValue interface{}) (interface{}, error) {
 	if property.WriteOnly {
 		return propertyLocalStateValue, nil
@@ -215,10 +248,8 @@ func convertPayloadToLocalStateDataValue(property *SpecSchemaDefinitionProperty,
 	//log.Printf("[INFO] propertyLocalStateValue: %s %s %s", reflect.TypeOf(propertyLocalStateValue), reflect.TypeOf(propertyLocalStateValue).Kind(), propertyLocalStateValue)
 	switch property.Type {
 	case TypeObject:
-		log.Printf("[INFO] ofTypeObject")
 		return convertObjectToLocalStateData(property, propertyValue, propertyLocalStateValue)
 	case TypeList:
-		log.Printf("[INFO] ofTypeList")
 		if isListOfPrimitives, _ := property.isTerraformListOfSimpleValues(); isListOfPrimitives {
 			return propertyValue, nil
 		}
@@ -265,21 +296,15 @@ func convertPayloadToLocalStateDataValue(property *SpecSchemaDefinitionProperty,
 			if propertyValue != nil {
 				arrayValue = propertyValue.([]interface{})
 			}
-			setValue := schema.NewSet(hashByName, arrayValue)
+			setValue := schema.NewSet(hashComplexObject, arrayValue)
 			log.Printf("[INFO] setValue: %s", setValue.List())
+			log.Printf("[INFO] properties: %s", property.String())
 
-			//localStateArrayValue := make([]interface{}, 0)
-			//if propertyLocalStateValue != nil {
-			//	localStateArrayValue = propertyLocalStateValue.([]interface{})
-			//}
-
-			localStateSetValue := schema.NewSet(hashByName, []interface{}{})
-
+			localStateSetValue := schema.NewSet(hashComplexObject, []interface{}{})
 			if propertyLocalStateValue != nil {
 				localStateSetValue = propertyLocalStateValue.(*schema.Set)
 			}
-			log.Printf("[INFO] propertyLocalStateValue: %s", propertyLocalStateValue)
-			log.Printf("[INFO] localStateSetValue: %s", localStateSetValue.List())
+			log.Printf("[INFO] localSetValue: %s", localStateSetValue.List())
 			localStateLength := len(localStateSetValue.List())
 			remoteStateLength := len(setValue.List())
 			if localStateLength >= remoteStateLength {
@@ -320,13 +345,11 @@ func convertPayloadToLocalStateDataValue(property *SpecSchemaDefinitionProperty,
 		}
 		return nil, fmt.Errorf("property '%s' is supposed to be an set objects", property.Name)
 	case TypeString:
-		log.Printf("[INFO] ofTypeString")
 		if propertyValue == nil {
 			return nil, nil
 		}
 		return propertyValue.(string), nil
 	case TypeInt:
-		log.Printf("[INFO] ofTypeInt")
 		if propertyValue == nil {
 			return nil, nil
 		}
@@ -336,13 +359,11 @@ func convertPayloadToLocalStateDataValue(property *SpecSchemaDefinitionProperty,
 		}
 		return int(propertyValue.(float64)), nil
 	case TypeFloat:
-		log.Printf("[INFO] ofTypeFloat")
 		if propertyValue == nil {
 			return nil, nil
 		}
 		return propertyValue.(float64), nil
 	case TypeBool:
-		log.Printf("[INFO] ofTypeBool")
 		if propertyValue == nil {
 			return nil, nil
 		}
