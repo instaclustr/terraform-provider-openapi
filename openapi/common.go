@@ -304,7 +304,8 @@ func convertPayloadToLocalStateDataValue(property *SpecSchemaDefinitionProperty,
 			if propertyLocalStateValue != nil {
 				localStateSetValue = propertyLocalStateValue.(*schema.Set)
 			}
-			log.Printf("[INFO] localSetValue: %s", localStateSetValue.List())
+			log.Printf("[INFO] localSetValue: %s", propertyLocalStateValue)
+			log.Printf("[INFO] localSetValueConverted: %s", localStateSetValue.List())
 			localStateLength := len(localStateSetValue.List())
 			remoteStateLength := len(setValue.List())
 			if localStateLength >= remoteStateLength {
