@@ -395,6 +395,7 @@ func convertPayloadToLocalStateDataValue(property *SpecSchemaDefinitionProperty,
 				arrayValue = propertyValue.([]interface{})
 			}
 			setValue, err := deepConvertArrayToSet(property, arrayValue)
+			log.Printf("[INFO] arrayValue: %s", arrayValue)
 			setLocalValue := propertyLocalStateValue.(*schema.Set)
 			if err != nil {
 				return err, nil
