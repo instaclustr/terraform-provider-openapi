@@ -241,34 +241,101 @@ func hashComplexObject(v interface{}) int {
 	return hashcode.String(buffer.String())
 }
 
-func deepConvertArrayToSet(v interface{}) (interface{}, error) {
+//func deepConvertArrayToSet(property *SpecSchemaDefinitionProperty, v interface{}) (interface{}, error) {
+//	switch v := v.(type) {
+//	case []interface{}:
+//		// For slices, create a new set and add each element to the set
+//		if property.IgnoreItemsOrder {
+//			set := schema.NewSet(hashComplexObject, []interface{}{})
+//			for k, elem := range v {
+//				convertedElem, err := deepConvertArrayToSet(property.SpecSchemaDefinition.Properties, elem)
+//				if err != nil {
+//					return nil, err
+//				}
+//				set.Add(convertedElem)
+//			}
+//			return set, nil
+//		}
+//	case map[string]interface{}:
+//		// For maps, create a new map and convert each value in the map
+//		newMap := make(map[string]interface{})
+//		for key, value := range v {
+//			convertedValue, err := deepConvertArrayToSet(property.SpecSchemaDefinition.Properties[key], value)
+//			if err != nil {
+//				return nil, err
+//			}
+//			newMap[key] = convertedValue
+//		}
+//		return newMap, nil
+//	default:
+//		// For other types, return the value as is
+//		return v, nil
+//	}
+//}
+
+func deepConvertArrayToSet(property *SpecSchemaDefinitionProperty, v interface{}) (interface{}, error) {
 	switch v := v.(type) {
 	case []interface{}:
 		// For slices, create a new set and add each element to the set
-		set := schema.NewSet(hashComplexObject, []interface{}{})
-		for _, elem := range v {
-			convertedElem, err := deepConvertArrayToSet(elem)
-			if err != nil {
-				return nil, err
+		if property.isSetProperty() {
+			set := schema.NewSet(hashComplexObject, []interface{}{})
+			for _, elem := range v {
+				if property.isSetOfObjectsProperty() {
+					convertedElem, err := deepConvertArrayToSetMap(property.SpecSchemaDefinition.Properties, elem)
+					if err != nil {
+						return nil, err
+					}
+					set.Add(convertedElem)
+				} else {
+					set.Add(elem)
+				}
 			}
-			set.Add(convertedElem)
+			return set, nil
 		}
-		return set, nil
-	case map[string]interface{}:
-		// For maps, create a new map and convert each value in the map
-		newMap := make(map[string]interface{})
-		for key, value := range v {
-			convertedValue, err := deepConvertArrayToSet(value)
-			if err != nil {
-				return nil, err
-			}
-			newMap[key] = convertedValue
-		}
-		return newMap, nil
+		return v, nil
 	default:
 		// For other types, return the value as is
 		return v, nil
 	}
+}
+
+func deepConvertArrayToSetMap(properties []*SpecSchemaDefinitionProperty, object interface{}) (interface{}, error) {
+	outerMap, ok := object.(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("object is not a map")
+	}
+
+	// Since outerMap has only one element, we can get that element directly
+	for outerKey, innerObject := range outerMap {
+		switch innerMap := innerObject.(type) {
+		case map[string]interface{}:
+			// For maps, create a new map and convert each value in the map
+			newMap := make(map[string]interface{})
+			for key, value := range innerMap {
+				//log.Printf("[INFO] key,value %s %s", key, value)
+				for _, property := range properties {
+					if key == property.Name {
+						//log.Printf("[INFO] key,value %s %s", key, value)
+						if property.isSetOfObjectsProperty() {
+							convertedValue, err := deepConvertArrayToSet(property, value)
+							if err != nil {
+								return nil, err
+							}
+							newMap[key] = convertedValue
+						} else {
+							newMap[key] = value
+						}
+					}
+				}
+			}
+			outerMap[outerKey] = newMap
+		default:
+			// For other types, return the value as is
+			outerMap[outerKey] = innerObject
+		}
+	}
+
+	return outerMap, nil
 }
 func convertPayloadToLocalStateDataValue(property *SpecSchemaDefinitionProperty, propertyValue interface{}, propertyLocalStateValue interface{}) (interface{}, error) {
 	if property.WriteOnly {
@@ -326,7 +393,7 @@ func convertPayloadToLocalStateDataValue(property *SpecSchemaDefinitionProperty,
 			if propertyValue != nil {
 				arrayValue = propertyValue.([]interface{})
 			}
-			setValue, err := deepConvertArrayToSet(arrayValue)
+			setValue, err := deepConvertArrayToSet(property, arrayValue)
 			setLocalValue := propertyLocalStateValue.(*schema.Set)
 			if err != nil {
 				return err, nil

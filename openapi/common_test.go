@@ -1140,9 +1140,12 @@ func TestDeepConvertArrayToSet(t *testing.T) {
 	Convey("Given a resource data (state) loaded with couple properties", t, func() {
 		Convey("When DeepConvertArrayToSet is called with a array of primitive element", func() {
 			inputArray := []interface{}{"value2", "value1", "value4"}
-			resultSet, err := deepConvertArrayToSet(inputArray)
+			property := newSetSchemaDefinitionPropertyWithDefaults("set_object_property", "", true, false, false, nil, TypeString, nil)
+			resultSet, err := deepConvertArrayToSet(property, inputArray)
 			Convey("Then the error should be nil and the result value should be the expected value with the right type array", func() {
 				So(err, ShouldBeNil)
+				So(resultSet, ShouldHaveSameTypeAs, &schema.Set{})
+				So(resultSet.(*schema.Set).Len(), ShouldEqual, 3)
 				So(resultSet.(*schema.Set).Contains("value2"), ShouldBeTrue)
 				So(resultSet.(*schema.Set).Contains("value1"), ShouldBeTrue)
 				So(resultSet.(*schema.Set).Contains("value4"), ShouldBeTrue)
@@ -1150,18 +1153,57 @@ func TestDeepConvertArrayToSet(t *testing.T) {
 			})
 		})
 		Convey("When DeepConvertArrayToSet is called with a array of complex object", func() {
+			nestedSetItemSchemaDefinition := &SpecSchemaDefinition{
+				Properties: SpecSchemaDefinitionProperties{
+					newIntSchemaDefinitionPropertyWithDefaults("nested_set_property", "", true, false, nil),
+					setSchemaDefinitionPropertyWriteOnly(newIntSchemaDefinitionPropertyWithDefaults("nested_set_property_password", "", true, false, nil)),
+				},
+			}
+			nestedArrayItemSchemaDefinition := &SpecSchemaDefinition{
+				Properties: SpecSchemaDefinitionProperties{
+					newIntSchemaDefinitionPropertyWithDefaults("nested_array_property", "", true, false, nil),
+					setSchemaDefinitionPropertyWriteOnly(newIntSchemaDefinitionPropertyWithDefaults("nested_array_property_password", "", true, false, nil)),
+				},
+			}
+			nestedObjectSchemaDefinition := &SpecSchemaDefinition{
+				Properties: SpecSchemaDefinitionProperties{
+					setSchemaDefinitionPropertyWriteOnly(newIntSchemaDefinitionPropertyWithDefaults("origin_port", "", true, false, 80)),
+					newStringSchemaDefinitionPropertyWithDefaults("protocol", "", true, false, "http"),
+					setSchemaDefinitionPropertyWriteOnly(newStringSchemaDefinitionPropertyWithDefaults("password", "", true, false, nil)),
+					setSchemaDefinitionPropertyWriteOnly(newListSchemaDefinitionPropertyWithDefaults("password_array", "", true, false, false, nil, TypeString, nil)),
+					newSetSchemaDefinitionPropertyWithDefaults("nested_set", "", true, false, false, nil, TypeObject, nestedSetItemSchemaDefinition),
+					newListSchemaDefinitionPropertyWithDefaults("nested_list", "", true, false, false, nil, TypeObject, nestedArrayItemSchemaDefinition),
+				},
+			}
+			//nestedObject := newObjectSchemaDefinitionPropertyWithDefaults("nested_object", "", true, false, false, nil, nestedObjectSchemaDefinition)
+			//propertyWithNestedObjectSchemaDefinition := &SpecSchemaDefinition{
+			//	Properties: SpecSchemaDefinitionProperties{
+			//		idProperty,
+			//		nestedObject,
+			//	},
+			//}
 			object1 := map[string]interface{}{
 				"nested_object": map[string]interface{}{
 					"origin_port": 12345,
 					"protocol":    "tcp",
+					"nested_set": []interface{}{
+						map[string]interface{}{
+							"nested_set_property":          123,
+							"nested_set_property_password": "setpassword123",
+						},
+						map[string]interface{}{
+							"nested_set_property":          456,
+							"nested_set_property_password": "setpassword456",
+						},
+					},
 					"nested_list": []interface{}{
 						map[string]interface{}{
 							"nested_list_property":          123,
-							"nested_list_property_password": "password123",
+							"nested_list_property_password": "listpassword123",
 						},
 						map[string]interface{}{
 							"nested_list_property":          456,
-							"nested_list_property_password": "password456",
+							"nested_list_property_password": "listpassword456",
 						},
 					},
 				},
@@ -1170,14 +1212,24 @@ func TestDeepConvertArrayToSet(t *testing.T) {
 				"nested_object": map[string]interface{}{
 					"origin_port": 54321,
 					"protocol":    "tcp",
+					"nested_set": []interface{}{
+						map[string]interface{}{
+							"nested_set_property":          789,
+							"nested_set_property_password": "setpassword789",
+						},
+						map[string]interface{}{
+							"nested_set_property":          987,
+							"nested_set_property_password": "setpassword987",
+						},
+					},
 					"nested_list": []interface{}{
 						map[string]interface{}{
 							"nested_list_property":          789,
-							"nested_list_property_password": "password789",
+							"nested_list_property_password": "listpassword789",
 						},
 						map[string]interface{}{
 							"nested_list_property":          987,
-							"nested_list_property_password": "password987",
+							"nested_list_property_password": "listpassword987",
 						},
 					},
 				},
@@ -1186,36 +1238,66 @@ func TestDeepConvertArrayToSet(t *testing.T) {
 				"nested_object": map[string]interface{}{
 					"origin_port": 11111,
 					"protocol":    "udp",
-					"nested_list": []interface{}{
+					"nested_set": []interface{}{
 						map[string]interface{}{
-							"nested_list_property":          987,
-							"nested_list_property_password": "password987",
+							"nested_set_property":          789,
+							"nested_set_property_password": "setpassword789",
 						},
 						map[string]interface{}{
+							"nested_set_property":          987,
+							"nested_set_property_password": "setpassword987",
+						},
+					},
+					"nested_list": []interface{}{
+						map[string]interface{}{
 							"nested_list_property":          789,
-							"nested_list_property_password": "password789",
+							"nested_list_property_password": "listpassword789",
+						},
+						map[string]interface{}{
+							"nested_list_property":          987,
+							"nested_list_property_password": "listpassword987",
 						},
 					},
 				},
 			}
-			object1NestedArrayElement1 := map[string]interface{}{
-				"nested_list_property":          123,
-				"nested_list_property_password": "password123",
+			object1NestedSetElement1 := map[string]interface{}{
+				"nested_set_property":          123,
+				"nested_set_property_password": "setpassword123",
 			}
-			object1NestedArrayElement2 := map[string]interface{}{
-				"nested_list_property":          456,
-				"nested_list_property_password": "password456",
+			object1NestedSetElement2 := map[string]interface{}{
+				"nested_set_property":          456,
+				"nested_set_property_password": "setpassword456",
 			}
-			object2NestedArrayElement1 := map[string]interface{}{
-				"nested_list_property":          789,
-				"nested_list_property_password": "password789",
+			object2NestedSetElement1 := map[string]interface{}{
+				"nested_set_property":          789,
+				"nested_set_property_password": "setpassword789",
 			}
-			object2NestedArrayElement2 := map[string]interface{}{
-				"nested_list_property":          987,
-				"nested_list_property_password": "password987",
+			object2NestedSetElement2 := map[string]interface{}{
+				"nested_set_property":          987,
+				"nested_set_property_password": "setpassword987",
+			}
+			object1NestedListElement1 := map[string]interface{}{
+				"nested_set_property":          123,
+				"nested_set_property_password": "listpassword123",
+			}
+			object1NestedListElement2 := map[string]interface{}{
+				"nested_set_property":          456,
+				"nested_set_property_password": "listpassword456",
+			}
+			object2NestedListElement1 := map[string]interface{}{
+				"nested_set_property":          789,
+				"nested_set_property_password": "listpassword789",
+			}
+			object2NestedListElement2 := map[string]interface{}{
+				"nested_set_property":          987,
+				"nested_set_property_password": "listpassword987",
 			}
 			inputArray := []interface{}{object1, object2, object3}
-			resultSet, err := deepConvertArrayToSet(inputArray)
+			//expectedPropertyWithNestedObjectName := "property_with_nested_object"
+			//propertyWithNestedObject := newObjectSchemaDefinitionPropertyWithDefaults(expectedPropertyWithNestedObjectName, "", true, false, false, nil, propertyWithNestedObjectSchemaDefinition)
+			expectedPropertyWithSetWithNestedObjectName := "property_with_set_with_nested_object"
+			setPropertyWithNestedObject := newSetSchemaDefinitionPropertyWithDefaults(expectedPropertyWithSetWithNestedObjectName, "", true, false, false, nil, TypeObject, nestedObjectSchemaDefinition)
+			resultSet, err := deepConvertArrayToSet(setPropertyWithNestedObject, inputArray)
 			//resultSet = resultSet.(*schema.Set)
 			Convey("Then the error should be nil and the result value should be the expected value with the right type array", func() {
 				So(err, ShouldBeNil)
@@ -1227,24 +1309,56 @@ func TestDeepConvertArrayToSet(t *testing.T) {
 					nestedObject, ok := obj["nested_object"].(map[string]interface{})
 					So(ok, ShouldBeTrue)
 
-					nestedList, ok := nestedObject["nested_list"].(*schema.Set)
+					nestedList, ok := nestedObject["nested_list"]
 					So(ok, ShouldBeTrue)
-					So(nestedList.Len(), ShouldEqual, 2)
+					So(nestedList, ShouldHaveSameTypeAs, []interface{}{})
+
+					nestedSet, ok := nestedObject["nested_set"].(*schema.Set)
+					So(ok, ShouldBeTrue)
+					So(nestedSet, ShouldHaveSameTypeAs, &schema.Set{})
+					So(nestedSet.Len(), ShouldEqual, 2)
 
 					protocol, ok := nestedObject["origin_port"].(int)
 					So(ok, ShouldBeTrue)
 					So(protocol == 12345 || protocol == 54321 || protocol == 11111, ShouldBeTrue)
 					if nestedObject["origin_port"] == 12345 {
-						So(nestedList.Contains(object1NestedArrayElement1), ShouldBeTrue)
-						So(nestedList.Contains(object1NestedArrayElement2), ShouldBeTrue)
-						So(nestedList.Contains(object2NestedArrayElement2), ShouldBeFalse)
-						So(nestedList.Contains(object2NestedArrayElement2), ShouldBeFalse)
+						expected := []interface{}{
+							map[string]interface{}{
+								"nested_list_property":          123,
+								"nested_list_property_password": "listpassword123",
+							},
+							map[string]interface{}{
+								"nested_list_property":          456,
+								"nested_list_property_password": "listpassword456",
+							},
+						}
+						So(nestedList, ShouldResemble, expected)
+
+						So(nestedSet.Contains(object1NestedSetElement1), ShouldBeTrue)
+						So(nestedSet.Contains(object1NestedSetElement2), ShouldBeTrue)
+						So(nestedSet.Contains(object2NestedSetElement1), ShouldBeFalse)
+						So(nestedSet.Contains(object2NestedSetElement2), ShouldBeFalse)
+						So(nestedSet.Contains(object1NestedListElement1), ShouldBeFalse)
+						So(nestedSet.Contains(object1NestedListElement2), ShouldBeFalse)
 					}
 					if nestedObject["origin_port"] == 54321 || nestedObject["origin_port"] == 11111 {
-						So(nestedList.Contains(object2NestedArrayElement1), ShouldBeTrue)
-						So(nestedList.Contains(object2NestedArrayElement2), ShouldBeTrue)
-						So(nestedList.Contains(object1NestedArrayElement2), ShouldBeFalse)
-						So(nestedList.Contains(object1NestedArrayElement2), ShouldBeFalse)
+						expected := []interface{}{
+							map[string]interface{}{
+								"nested_list_property":          789,
+								"nested_list_property_password": "listpassword789",
+							},
+							map[string]interface{}{
+								"nested_list_property":          987,
+								"nested_list_property_password": "listpassword987",
+							},
+						}
+						So(nestedList, ShouldResemble, expected)
+						So(nestedSet.Contains(object2NestedSetElement1), ShouldBeTrue)
+						So(nestedSet.Contains(object2NestedSetElement2), ShouldBeTrue)
+						So(nestedSet.Contains(object1NestedSetElement1), ShouldBeFalse)
+						So(nestedSet.Contains(object1NestedSetElement2), ShouldBeFalse)
+						So(nestedSet.Contains(object2NestedListElement1), ShouldBeFalse)
+						So(nestedSet.Contains(object2NestedListElement2), ShouldBeFalse)
 					}
 				}
 			})
