@@ -274,6 +274,7 @@ func hashComplexObject(v interface{}) int {
 //}
 
 func deepConvertArrayToSet(property *SpecSchemaDefinitionProperty, v interface{}) (interface{}, error) {
+	log.Printf("[INFO] input of deep copy %s %s", property.String(), v)
 	switch v := v.(type) {
 	case []interface{}:
 		// For slices, create a new set and add each element to the set
@@ -340,6 +341,7 @@ func deepConvertArrayToSetMap(properties []*SpecSchemaDefinitionProperty, object
 }
 
 func deepConvertArrayToSetMapNew(properties []*SpecSchemaDefinitionProperty, object interface{}) (interface{}, error) {
+	log.Printf("[INFO] input of deep copy map %s %s", properties, object)
 	inputMap, ok := object.(map[string]interface{})
 	if !ok {
 		return nil, fmt.Errorf("object is not a map")
