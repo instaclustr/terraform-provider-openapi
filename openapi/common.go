@@ -435,7 +435,13 @@ func convertPayloadToLocalStateDataValue(property *SpecSchemaDefinitionProperty,
 				setValue = propertyValue
 			}
 			//log.Printf("[INFO] arrayValue: %s", arrayValue)
-			setLocalValue := propertyLocalStateValue.(*schema.Set)
+			var setLocalValue *schema.Set
+
+			if propertyLocalStateValue == nil {
+				setLocalValue = schema.NewSet(schema.HashString, []interface{}{})
+			} else {
+				setLocalValue = propertyLocalStateValue.(*schema.Set)
+			}
 			if err != nil {
 				return err, nil
 			}
