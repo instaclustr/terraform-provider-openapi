@@ -274,7 +274,7 @@ func hashComplexObject(v interface{}) int {
 //}
 
 func deepConvertArrayToSet(property *SpecSchemaDefinitionProperty, v interface{}) (interface{}, error) {
-	log.Printf("[INFO] input of deep copy %s %s", property.String(), v)
+	//log.Printf("[INFO] input of deep copy %s %s", property.String(), v)
 	switch v := v.(type) {
 	case []interface{}:
 		// For slices, create a new set and add each element to the set
@@ -291,7 +291,7 @@ func deepConvertArrayToSet(property *SpecSchemaDefinitionProperty, v interface{}
 					set.Add(elem)
 				}
 			}
-			log.Printf("[INFO] output of deep copy %s %s %s", property.String(), v, set)
+			//log.Printf("[INFO] output of deep copy %s %s %s", property.String(), v, set)
 			return set, nil
 		}
 		return v, nil
@@ -319,7 +319,7 @@ func deepConvertArrayToSetMap(properties []*SpecSchemaDefinitionProperty, object
 					if key == property.Name {
 						//log.Printf("[INFO] key,value %s %s", key, value)
 						if property.isSetOfObjectsProperty() {
-							log.Printf("[INFO] key,value %s %s", key, value)
+							//log.Printf("[INFO] key,value %s %s", key, value)
 							convertedValue, err := deepConvertArrayToSet(property, value)
 							if err != nil {
 								return nil, err
@@ -337,12 +337,12 @@ func deepConvertArrayToSetMap(properties []*SpecSchemaDefinitionProperty, object
 			outerMap[outerKey] = innerObject
 		}
 	}
-	log.Printf("[INFO] output of deep copy map %s %s %s", properties, object, outerMap)
+	//log.Printf("[INFO] output of deep copy map %s %s %s", properties, object, outerMap)
 	return outerMap, nil
 }
 
 func deepConvertArrayToSetMapNew(properties []*SpecSchemaDefinitionProperty, object interface{}) (interface{}, error) {
-	log.Printf("[INFO] input of deep copy map %s %s", properties, object)
+	//log.Printf("[INFO] input of deep copy map %s %s", properties, object)
 	inputMap, ok := object.(map[string]interface{})
 	if !ok {
 		return nil, fmt.Errorf("object is not a map")
@@ -356,7 +356,7 @@ func deepConvertArrayToSetMapNew(properties []*SpecSchemaDefinitionProperty, obj
 			if key == property.Name {
 				//log.Printf("[INFO] key,value %s %s", key, value)
 				if property.isSetOfObjectsProperty() {
-					log.Printf("[INFO] key,value %s %s", key, value)
+					//log.Printf("[INFO] key,value %s %s", key, value)
 					convertedValue, err := deepConvertArrayToSet(property, value)
 					if err != nil {
 						return nil, err
@@ -429,28 +429,29 @@ func convertPayloadToLocalStateDataValue(property *SpecSchemaDefinitionProperty,
 				arrayValue = propertyValue.([]interface{})
 			}
 			setValue, err := deepConvertArrayToSet(property, arrayValue)
-			log.Printf("[INFO] arrayValue: %s", arrayValue)
+			//log.Printf("[INFO] arrayValue: %s", arrayValue)
 			setLocalValue := propertyLocalStateValue.(*schema.Set)
 			if err != nil {
 				return err, nil
 			}
-			log.Printf("[INFO] setValue: %s", setValue)
+			//log.Printf("[INFO] setValue: %s", setValue)
 			for _, v1 := range setValue.(*schema.Set).List() {
 				// Do something with v
-				hashCodeRemote := hashComplexObject(v1)
-				for _, v2 := range setLocalValue.List() {
-					hashCodeLocal := hashComplexObject(v2)
-					log.Printf("[INFO] properties: %s", property.String())
-					log.Printf("[INFO] remote: %s %d", v1, hashCodeRemote)
-					log.Printf("[INFO] local: %s %d", v2, hashCodeLocal)
-					if hashCodeLocal == hashCodeRemote {
-						objectValue, err := convertObjectToLocalStateData(property, v1, v2)
-						if err != nil {
-							return err, nil
-						}
-						setInput.Add(objectValue)
-					}
-				}
+				//hashCodeRemote := hashComplexObject(v1)
+				setInput.Add(v1)
+				//for _, v2 := range setLocalValue.List() {
+				//	hashCodeLocal := hashComplexObject(v2)
+				//	log.Printf("[INFO] properties: %s", property.String())
+				//	log.Printf("[INFO] remote: %s %d", v1, hashCodeRemote)
+				//	log.Printf("[INFO] local: %s %d", v2, hashCodeLocal)
+				//	if hashCodeLocal == hashCodeRemote {
+				//		objectValue, err := convertObjectToLocalStateData(property, v1, v2)
+				//		if err != nil {
+				//			return err, nil
+				//		}
+				//		setInput.Add(objectValue)
+				//	}
+				//}
 			}
 			return setInput, nil
 		}

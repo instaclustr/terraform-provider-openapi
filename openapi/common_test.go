@@ -1183,80 +1183,74 @@ func TestDeepConvertArrayToSet(t *testing.T) {
 			//	},
 			//}
 			object1 := map[string]interface{}{
-				"nested_object": map[string]interface{}{
-					"origin_port": 12345,
-					"protocol":    "tcp",
-					"nested_set": []interface{}{
-						map[string]interface{}{
-							"nested_set_property":          123,
-							"nested_set_property_password": "setpassword123",
-						},
-						map[string]interface{}{
-							"nested_set_property":          456,
-							"nested_set_property_password": "setpassword456",
-						},
+				"origin_port": 12345,
+				"protocol":    "tcp",
+				"nested_set": []interface{}{
+					map[string]interface{}{
+						"nested_set_property":          123,
+						"nested_set_property_password": "setpassword123",
 					},
-					"nested_list": []interface{}{
-						map[string]interface{}{
-							"nested_list_property":          123,
-							"nested_list_property_password": "listpassword123",
-						},
-						map[string]interface{}{
-							"nested_list_property":          456,
-							"nested_list_property_password": "listpassword456",
-						},
+					map[string]interface{}{
+						"nested_set_property":          456,
+						"nested_set_property_password": "setpassword456",
+					},
+				},
+				"nested_list": []interface{}{
+					map[string]interface{}{
+						"nested_list_property":          123,
+						"nested_list_property_password": "listpassword123",
+					},
+					map[string]interface{}{
+						"nested_list_property":          456,
+						"nested_list_property_password": "listpassword456",
 					},
 				},
 			}
 			object2 := map[string]interface{}{
-				"nested_object": map[string]interface{}{
-					"origin_port": 54321,
-					"protocol":    "tcp",
-					"nested_set": []interface{}{
-						map[string]interface{}{
-							"nested_set_property":          789,
-							"nested_set_property_password": "setpassword789",
-						},
-						map[string]interface{}{
-							"nested_set_property":          987,
-							"nested_set_property_password": "setpassword987",
-						},
+				"origin_port": 54321,
+				"protocol":    "tcp",
+				"nested_set": []interface{}{
+					map[string]interface{}{
+						"nested_set_property":          789,
+						"nested_set_property_password": "setpassword789",
 					},
-					"nested_list": []interface{}{
-						map[string]interface{}{
-							"nested_list_property":          789,
-							"nested_list_property_password": "listpassword789",
-						},
-						map[string]interface{}{
-							"nested_list_property":          987,
-							"nested_list_property_password": "listpassword987",
-						},
+					map[string]interface{}{
+						"nested_set_property":          987,
+						"nested_set_property_password": "setpassword987",
+					},
+				},
+				"nested_list": []interface{}{
+					map[string]interface{}{
+						"nested_list_property":          789,
+						"nested_list_property_password": "listpassword789",
+					},
+					map[string]interface{}{
+						"nested_list_property":          987,
+						"nested_list_property_password": "listpassword987",
 					},
 				},
 			}
 			object3 := map[string]interface{}{
-				"nested_object": map[string]interface{}{
-					"origin_port": 11111,
-					"protocol":    "udp",
-					"nested_set": []interface{}{
-						map[string]interface{}{
-							"nested_set_property":          789,
-							"nested_set_property_password": "setpassword789",
-						},
-						map[string]interface{}{
-							"nested_set_property":          987,
-							"nested_set_property_password": "setpassword987",
-						},
+				"origin_port": 11111,
+				"protocol":    "udp",
+				"nested_set": []interface{}{
+					map[string]interface{}{
+						"nested_set_property":          789,
+						"nested_set_property_password": "setpassword789",
 					},
-					"nested_list": []interface{}{
-						map[string]interface{}{
-							"nested_list_property":          789,
-							"nested_list_property_password": "listpassword789",
-						},
-						map[string]interface{}{
-							"nested_list_property":          987,
-							"nested_list_property_password": "listpassword987",
-						},
+					map[string]interface{}{
+						"nested_set_property":          987,
+						"nested_set_property_password": "setpassword987",
+					},
+				},
+				"nested_list": []interface{}{
+					map[string]interface{}{
+						"nested_list_property":          789,
+						"nested_list_property_password": "listpassword789",
+					},
+					map[string]interface{}{
+						"nested_list_property":          987,
+						"nested_list_property_password": "listpassword987",
 					},
 				},
 			}
@@ -1306,22 +1300,19 @@ func TestDeepConvertArrayToSet(t *testing.T) {
 					obj, ok := v.(map[string]interface{})
 					So(ok, ShouldBeTrue)
 
-					nestedObject, ok := obj["nested_object"].(map[string]interface{})
-					So(ok, ShouldBeTrue)
-
-					nestedList, ok := nestedObject["nested_list"]
+					nestedList, ok := obj["nested_list"]
 					So(ok, ShouldBeTrue)
 					So(nestedList, ShouldHaveSameTypeAs, []interface{}{})
 
-					nestedSet, ok := nestedObject["nested_set"].(*schema.Set)
+					nestedSet, ok := obj["nested_set"].(*schema.Set)
 					So(ok, ShouldBeTrue)
 					So(nestedSet, ShouldHaveSameTypeAs, &schema.Set{})
 					So(nestedSet.Len(), ShouldEqual, 2)
 
-					protocol, ok := nestedObject["origin_port"].(int)
+					protocol, ok := obj["origin_port"].(int)
 					So(ok, ShouldBeTrue)
 					So(protocol == 12345 || protocol == 54321 || protocol == 11111, ShouldBeTrue)
-					if nestedObject["origin_port"] == 12345 {
+					if obj["origin_port"] == 12345 {
 						expected := []interface{}{
 							map[string]interface{}{
 								"nested_list_property":          123,
@@ -1340,8 +1331,7 @@ func TestDeepConvertArrayToSet(t *testing.T) {
 						So(nestedSet.Contains(object2NestedSetElement2), ShouldBeFalse)
 						So(nestedSet.Contains(object1NestedListElement1), ShouldBeFalse)
 						So(nestedSet.Contains(object1NestedListElement2), ShouldBeFalse)
-					}
-					if nestedObject["origin_port"] == 54321 || nestedObject["origin_port"] == 11111 {
+					} else if obj["origin_port"] == 54321 || obj["origin_port"] == 11111 {
 						expected := []interface{}{
 							map[string]interface{}{
 								"nested_list_property":          789,
@@ -1359,6 +1349,8 @@ func TestDeepConvertArrayToSet(t *testing.T) {
 						So(nestedSet.Contains(object1NestedSetElement2), ShouldBeFalse)
 						So(nestedSet.Contains(object2NestedListElement1), ShouldBeFalse)
 						So(nestedSet.Contains(object2NestedListElement2), ShouldBeFalse)
+					} else {
+						So(false, ShouldBeFalse)
 					}
 				}
 			})
