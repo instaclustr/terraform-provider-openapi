@@ -317,11 +317,12 @@ func deepConvertArrayToSetMap(properties []*SpecSchemaDefinitionProperty, object
 					if key == property.Name {
 						//log.Printf("[INFO] key,value %s %s", key, value)
 						if property.isSetOfObjectsProperty() {
+							log.Printf("[INFO] key,value %s %s", key, value)
 							convertedValue, err := deepConvertArrayToSet(property, value)
 							if err != nil {
 								return nil, err
 							}
-							newMap[key] = convertedValue
+							newMap[key] = convertedValue.(*schema.Set)
 						} else {
 							newMap[key] = value
 						}
