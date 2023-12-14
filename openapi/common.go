@@ -437,21 +437,20 @@ func convertPayloadToLocalStateDataValue(property *SpecSchemaDefinitionProperty,
 			//log.Printf("[INFO] setValue: %s", setValue)
 			for _, v1 := range setValue.(*schema.Set).List() {
 				// Do something with v
-				//hashCodeRemote := hashComplexObject(v1)
-				setInput.Add(v1)
-				//for _, v2 := range setLocalValue.List() {
-				//	hashCodeLocal := hashComplexObject(v2)
-				//	log.Printf("[INFO] properties: %s", property.String())
-				//	log.Printf("[INFO] remote: %s %d", v1, hashCodeRemote)
-				//	log.Printf("[INFO] local: %s %d", v2, hashCodeLocal)
-				//	if hashCodeLocal == hashCodeRemote {
-				//		objectValue, err := convertObjectToLocalStateData(property, v1, v2)
-				//		if err != nil {
-				//			return err, nil
-				//		}
-				//		setInput.Add(objectValue)
-				//	}
-				//}
+				hashCodeRemote := hashComplexObject(v1)
+				for _, v2 := range setLocalValue.List() {
+					hashCodeLocal := hashComplexObject(v2)
+					log.Printf("[INFO] properties: %s", property.String())
+					log.Printf("[INFO] remote: %s %d", v1, hashCodeRemote)
+					log.Printf("[INFO] local: %s %d", v2, hashCodeLocal)
+					if hashCodeLocal == hashCodeRemote {
+						objectValue, err := convertObjectToLocalStateData(property, v1, v2)
+						if err != nil {
+							return err, nil
+						}
+						setInput.Add(objectValue)
+					}
+				}
 			}
 			return setInput, nil
 		}
