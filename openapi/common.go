@@ -240,6 +240,36 @@ func hashComplexObject(v interface{}) int {
 	// Compute and return the hash of the concatenated string
 	return hashcode.String(buffer.String())
 }
+
+func deepConvertArrayToSet(v interface{}) (interface{}, error) {
+	switch v := v.(type) {
+	case []interface{}:
+		// For slices, create a new set and add each element to the set
+		set := schema.NewSet(hashComplexObject, []interface{}{})
+		for _, elem := range v {
+			convertedElem, err := deepConvertArrayToSet(elem)
+			if err != nil {
+				return nil, err
+			}
+			set.Add(convertedElem)
+		}
+		return set, nil
+	case map[string]interface{}:
+		// For maps, create a new map and convert each value in the map
+		newMap := make(map[string]interface{})
+		for key, value := range v {
+			convertedValue, err := deepConvertArrayToSet(value)
+			if err != nil {
+				return nil, err
+			}
+			newMap[key] = convertedValue
+		}
+		return newMap, nil
+	default:
+		// For other types, return the value as is
+		return v, nil
+	}
+}
 func convertPayloadToLocalStateDataValue(property *SpecSchemaDefinitionProperty, propertyValue interface{}, propertyLocalStateValue interface{}) (interface{}, error) {
 	if property.WriteOnly {
 		return propertyLocalStateValue, nil
@@ -296,51 +326,27 @@ func convertPayloadToLocalStateDataValue(property *SpecSchemaDefinitionProperty,
 			if propertyValue != nil {
 				arrayValue = propertyValue.([]interface{})
 			}
-			setValue := schema.NewSet(hashComplexObject, arrayValue)
-			log.Printf("[INFO] setValue: %s", setValue.List())
-			log.Printf("[INFO] properties: %s", property.String1())
-			log.Printf("[INFO] properties: %s", property.String())
-
-			localStateSetValue := schema.NewSet(hashComplexObject, []interface{}{})
-			if propertyLocalStateValue != nil {
-				localStateSetValue = propertyLocalStateValue.(*schema.Set)
+			setValue, err := deepConvertArrayToSet(arrayValue)
+			setLocalValue := propertyLocalStateValue.(*schema.Set)
+			if err != nil {
+				return err, nil
 			}
-			log.Printf("[INFO] localSetValue: %s", propertyLocalStateValue)
-			log.Printf("[INFO] localSetValueConverted: %s", localStateSetValue.List())
-			localStateLength := len(localStateSetValue.List())
-			remoteStateLength := len(setValue.List())
-			if localStateLength >= remoteStateLength {
-				for _, localStateItem := range localStateSetValue.List() {
-					// elem is an interface{}, so you'll need to cast it to whatever type your set elements are
-					var remoteStateItem interface{} = nil
-					for _, remoteStateItem2 := range setValue.List() {
-						if remoteStateItem2.(map[string]interface{})["name"] == localStateItem.(map[string]interface{})["name"] {
-							remoteStateItem = remoteStateItem2
-							break
+			log.Printf("[INFO] setValue: %s", setValue)
+			for _, v1 := range setValue.(*schema.Set).List() {
+				// Do something with v
+				hashCodeRemote := hashComplexObject(v1)
+				for _, v2 := range setLocalValue.List() {
+					hashCodeLocal := hashComplexObject(v2)
+					log.Printf("[INFO] properties: %s", property.String())
+					log.Printf("[INFO] remote: %s %d", v1, hashCodeRemote)
+					log.Printf("[INFO] local: %s %d", v2, hashCodeLocal)
+					if hashCodeLocal == hashCodeRemote {
+						objectValue, err := convertObjectToLocalStateData(property, v1, v2)
+						if err != nil {
+							return err, nil
 						}
+						setInput.Add(objectValue)
 					}
-					objectValue, err := convertObjectToLocalStateData(property, remoteStateItem, localStateItem)
-					if err != nil {
-						return err, nil
-					}
-					setInput.Add(objectValue)
-				}
-			}
-			if localStateLength < remoteStateLength {
-				for _, remoteStateItem := range setValue.List() {
-					// elem is an interface{}, so you'll need to cast it to whatever type your set elements are
-					var localStateItem interface{} = nil
-					for _, localStateItem2 := range localStateSetValue.List() {
-						if localStateItem2.(map[string]interface{})["name"] == remoteStateItem.(map[string]interface{})["name"] {
-							remoteStateItem = localStateItem2
-							break
-						}
-					}
-					objectValue, err := convertObjectToLocalStateData(property, remoteStateItem, localStateItem)
-					if err != nil {
-						return err, nil
-					}
-					setInput.Add(objectValue)
 				}
 			}
 			return setInput, nil

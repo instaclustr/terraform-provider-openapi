@@ -1111,7 +1111,7 @@ func TestConvertPayloadToLocalStateDataValue(t *testing.T) {
 						},
 					},
 				}
-				resultValue, err := convertPayloadToLocalStateDataValue(propertyWithNestedObject, dataValue, localStateValue)
+				resultValue, err := convertPayloadToLocalStateDataValue(propertyWithNestedObject, dataValues, localStateValue)
 
 				Convey("Then the result returned should be the expected one", func() {
 					So(err, ShouldBeNil)
@@ -1132,6 +1132,123 @@ func TestConvertPayloadToLocalStateDataValue(t *testing.T) {
 					So(nestedListItem["nested_list_property_password"], ShouldEqual, "local secret value")
 				})
 			})
+		})
+	})
+}
+
+func TestDeepConvertArrayToSet(t *testing.T) {
+	Convey("Given a resource data (state) loaded with couple properties", t, func() {
+		Convey("When DeepConvertArrayToSet is called with a array of primitive element", func() {
+			inputArray := []interface{}{"value2", "value1", "value4"}
+			resultSet, err := deepConvertArrayToSet(inputArray)
+			Convey("Then the error should be nil and the result value should be the expected value with the right type array", func() {
+				So(err, ShouldBeNil)
+				So(resultSet.(*schema.Set).Contains("value2"), ShouldBeTrue)
+				So(resultSet.(*schema.Set).Contains("value1"), ShouldBeTrue)
+				So(resultSet.(*schema.Set).Contains("value4"), ShouldBeTrue)
+				So(resultSet.(*schema.Set).Contains("va"), ShouldBeFalse)
+			})
+		})
+		Convey("When DeepConvertArrayToSet is called with a array of complex object", func() {
+			object1 := map[string]interface{}{
+				"nested_object": map[string]interface{}{
+					"origin_port": 12345,
+					"protocol":    "tcp",
+					"nested_list": []interface{}{
+						map[string]interface{}{
+							"nested_list_property":          123,
+							"nested_list_property_password": "password123",
+						},
+						map[string]interface{}{
+							"nested_list_property":          456,
+							"nested_list_property_password": "password456",
+						},
+					},
+				},
+			}
+			object2 := map[string]interface{}{
+				"nested_object": map[string]interface{}{
+					"origin_port": 54321,
+					"protocol":    "tcp",
+					"nested_list": []interface{}{
+						map[string]interface{}{
+							"nested_list_property":          789,
+							"nested_list_property_password": "password789",
+						},
+						map[string]interface{}{
+							"nested_list_property":          987,
+							"nested_list_property_password": "password987",
+						},
+					},
+				},
+			}
+			object3 := map[string]interface{}{
+				"nested_object": map[string]interface{}{
+					"origin_port": 11111,
+					"protocol":    "udp",
+					"nested_list": []interface{}{
+						map[string]interface{}{
+							"nested_list_property":          987,
+							"nested_list_property_password": "password987",
+						},
+						map[string]interface{}{
+							"nested_list_property":          789,
+							"nested_list_property_password": "password789",
+						},
+					},
+				},
+			}
+			object1NestedArrayElement1 := map[string]interface{}{
+				"nested_list_property":          123,
+				"nested_list_property_password": "password123",
+			}
+			object1NestedArrayElement2 := map[string]interface{}{
+				"nested_list_property":          456,
+				"nested_list_property_password": "password456",
+			}
+			object2NestedArrayElement1 := map[string]interface{}{
+				"nested_list_property":          789,
+				"nested_list_property_password": "password789",
+			}
+			object2NestedArrayElement2 := map[string]interface{}{
+				"nested_list_property":          987,
+				"nested_list_property_password": "password987",
+			}
+			inputArray := []interface{}{object1, object2, object3}
+			resultSet, err := deepConvertArrayToSet(inputArray)
+			//resultSet = resultSet.(*schema.Set)
+			Convey("Then the error should be nil and the result value should be the expected value with the right type array", func() {
+				So(err, ShouldBeNil)
+				So(resultSet.(*schema.Set).Len(), ShouldEqual, 3)
+				for _, v := range resultSet.(*schema.Set).List() {
+					obj, ok := v.(map[string]interface{})
+					So(ok, ShouldBeTrue)
+
+					nestedObject, ok := obj["nested_object"].(map[string]interface{})
+					So(ok, ShouldBeTrue)
+
+					nestedList, ok := nestedObject["nested_list"].(*schema.Set)
+					So(ok, ShouldBeTrue)
+					So(nestedList.Len(), ShouldEqual, 2)
+
+					protocol, ok := nestedObject["origin_port"].(int)
+					So(ok, ShouldBeTrue)
+					So(protocol == 12345 || protocol == 54321 || protocol == 11111, ShouldBeTrue)
+					if nestedObject["origin_port"] == 12345 {
+						So(nestedList.Contains(object1NestedArrayElement1), ShouldBeTrue)
+						So(nestedList.Contains(object1NestedArrayElement2), ShouldBeTrue)
+						So(nestedList.Contains(object2NestedArrayElement2), ShouldBeFalse)
+						So(nestedList.Contains(object2NestedArrayElement2), ShouldBeFalse)
+					}
+					if nestedObject["origin_port"] == 54321 || nestedObject["origin_port"] == 11111 {
+						So(nestedList.Contains(object2NestedArrayElement1), ShouldBeTrue)
+						So(nestedList.Contains(object2NestedArrayElement2), ShouldBeTrue)
+						So(nestedList.Contains(object1NestedArrayElement2), ShouldBeFalse)
+						So(nestedList.Contains(object1NestedArrayElement2), ShouldBeFalse)
+					}
+				}
+			})
+
 		})
 	})
 }
