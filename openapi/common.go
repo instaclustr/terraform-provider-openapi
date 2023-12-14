@@ -139,7 +139,7 @@ func updateStateWithPayloadDataAndOptions(openAPIResource SpecResource, remoteDa
 			propValue = processIgnoreOrderIfEnabled(*property, propertyLocalStateValue, propertyRemoteValue)
 		}
 
-		value, err := convertPayloadToLocalStateDataValue(property, propValue, propertyLocalStateValue)
+		value, err := convertPayloadToLocalStateDataValue(property, propValue, propertyLocalStateValue, true)
 		if err != nil {
 			return err
 		}
@@ -372,7 +372,7 @@ func deepConvertArrayToSetMapNew(properties []*SpecSchemaDefinitionProperty, obj
 	return newMap, nil
 }
 
-func convertPayloadToLocalStateDataValue(property *SpecSchemaDefinitionProperty, propertyValue interface{}, propertyLocalStateValue interface{}) (interface{}, error) {
+func convertPayloadToLocalStateDataValue(property *SpecSchemaDefinitionProperty, propertyValue interface{}, propertyLocalStateValue interface{}, isFromAPI bool) (interface{}, error) {
 	if property.WriteOnly {
 		return propertyLocalStateValue, nil
 	}
@@ -423,12 +423,17 @@ func convertPayloadToLocalStateDataValue(property *SpecSchemaDefinitionProperty,
 		}
 		if property.isSetOfObjectsProperty() {
 			setInput := schema.NewSet(hashByName, []interface{}{})
-
-			arrayValue := make([]interface{}, 0)
-			if propertyValue != nil {
-				arrayValue = propertyValue.([]interface{})
+			var setValue interface{}
+			var err error
+			if isFromAPI {
+				arrayValue := make([]interface{}, 0)
+				if propertyValue != nil {
+					arrayValue = propertyValue.([]interface{})
+				}
+				setValue, err = deepConvertArrayToSet(property, arrayValue)
+			} else {
+				setValue = propertyValue
 			}
-			setValue, err := deepConvertArrayToSet(property, arrayValue)
 			//log.Printf("[INFO] arrayValue: %s", arrayValue)
 			setLocalValue := propertyLocalStateValue.(*schema.Set)
 			if err != nil {
@@ -519,7 +524,7 @@ func convertObjectToLocalStateData(property *SpecSchemaDefinitionProperty, prope
 
 		// Here we are processing the items of the list which are objects. In this case we need to keep the original
 		// types as Terraform honors property types for resource schemas attached to TypeList properties
-		propValue, err := convertPayloadToLocalStateDataValue(schemaDefinitionProperty, propertyValue, localStateMapValue[propertyName])
+		propValue, err := convertPayloadToLocalStateDataValue(schemaDefinitionProperty, propertyValue, localStateMapValue[propertyName], false)
 		if err != nil {
 			return nil, err
 		}
