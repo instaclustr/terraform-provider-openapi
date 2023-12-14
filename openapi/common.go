@@ -291,6 +291,7 @@ func deepConvertArrayToSet(property *SpecSchemaDefinitionProperty, v interface{}
 					set.Add(elem)
 				}
 			}
+			log.Printf("[INFO] output of deep copy %s %s %s", property.String(), v, set)
 			return set, nil
 		}
 		return v, nil
@@ -336,7 +337,7 @@ func deepConvertArrayToSetMap(properties []*SpecSchemaDefinitionProperty, object
 			outerMap[outerKey] = innerObject
 		}
 	}
-
+	log.Printf("[INFO] output of deep copy map %s %s %s", properties, object, outerMap)
 	return outerMap, nil
 }
 
