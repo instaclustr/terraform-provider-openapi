@@ -281,7 +281,7 @@ func deepConvertArrayToSet(property *SpecSchemaDefinitionProperty, v interface{}
 			set := schema.NewSet(hashComplexObject, []interface{}{})
 			for _, elem := range v {
 				if property.isSetOfObjectsProperty() {
-					convertedElem, err := deepConvertArrayToSetMap(property.SpecSchemaDefinition.Properties, elem)
+					convertedElem, err := deepConvertArrayToSetMapNew(property.SpecSchemaDefinition.Properties, elem)
 					if err != nil {
 						return nil, err
 					}
@@ -338,6 +338,37 @@ func deepConvertArrayToSetMap(properties []*SpecSchemaDefinitionProperty, object
 
 	return outerMap, nil
 }
+
+func deepConvertArrayToSetMapNew(properties []*SpecSchemaDefinitionProperty, object interface{}) (interface{}, error) {
+	inputMap, ok := object.(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("object is not a map")
+	}
+
+	// Create a new map and convert each value in the map
+	newMap := make(map[string]interface{})
+	for key, value := range inputMap {
+		//log.Printf("[INFO] key,value %s %s", key, value)
+		for _, property := range properties {
+			if key == property.Name {
+				//log.Printf("[INFO] key,value %s %s", key, value)
+				if property.isSetOfObjectsProperty() {
+					log.Printf("[INFO] key,value %s %s", key, value)
+					convertedValue, err := deepConvertArrayToSet(property, value)
+					if err != nil {
+						return nil, err
+					}
+					newMap[key] = convertedValue.(*schema.Set)
+				} else {
+					newMap[key] = value
+				}
+			}
+		}
+	}
+
+	return newMap, nil
+}
+
 func convertPayloadToLocalStateDataValue(property *SpecSchemaDefinitionProperty, propertyValue interface{}, propertyLocalStateValue interface{}) (interface{}, error) {
 	if property.WriteOnly {
 		return propertyLocalStateValue, nil
