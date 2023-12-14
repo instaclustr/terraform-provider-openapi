@@ -438,6 +438,7 @@ func convertPayloadToLocalStateDataValue(property *SpecSchemaDefinitionProperty,
 			for _, v1 := range setValue.(*schema.Set).List() {
 				// Do something with v
 				hashCodeRemote := hashComplexObject(v1)
+				matched := false
 				for _, v2 := range setLocalValue.List() {
 					hashCodeLocal := hashComplexObject(v2)
 					log.Printf("[INFO] properties: %s", property.String())
@@ -445,11 +446,20 @@ func convertPayloadToLocalStateDataValue(property *SpecSchemaDefinitionProperty,
 					log.Printf("[INFO] local: %s %d", v2, hashCodeLocal)
 					if hashCodeLocal == hashCodeRemote {
 						objectValue, err := convertObjectToLocalStateData(property, v1, v2)
+						matched = true
 						if err != nil {
 							return err, nil
 						}
 						setInput.Add(objectValue)
 					}
+				}
+				if matched == false {
+					objectValue, err := convertObjectToLocalStateData(property, v1, nil)
+					matched = true
+					if err != nil {
+						return err, nil
+					}
+					setInput.Add(objectValue)
 				}
 			}
 			return setInput, nil
