@@ -454,6 +454,8 @@ func convertPayloadToLocalStateDataValue(property *SpecSchemaDefinitionProperty,
 					}
 				}
 				if matched == false {
+					log.Printf("[INFO] properties: %s", property.String())
+					log.Printf("[INFO] remote: %s %d", v1, hashCodeRemote)
 					objectValue, err := convertObjectToLocalStateData(property, v1, nil)
 					matched = true
 					if err != nil {
