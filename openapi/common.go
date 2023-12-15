@@ -417,12 +417,12 @@ func convertPayloadToLocalStateDataValue(property *SpecSchemaDefinitionProperty,
 		}
 		return nil, fmt.Errorf("property '%s' is supposed to be an array objects", property.Name)
 	case TypeSet:
-		log.Printf("[INFO] ofTypeSet")
+		//log.Printf("[INFO] ofTypeSet1")
 		if isSetOfPrimitives, _ := property.isTerraformSetOfSimpleValues(); isSetOfPrimitives {
 			return propertyValue, nil
 		}
 		if property.isSetOfObjectsProperty() {
-			setInput := schema.NewSet(hashByName, []interface{}{})
+			setInput := schema.NewSet(hashComplexObject, []interface{}{})
 			var setValue interface{}
 			var err error
 			if isFromAPI {
@@ -452,9 +452,9 @@ func convertPayloadToLocalStateDataValue(property *SpecSchemaDefinitionProperty,
 				matched := false
 				for _, v2 := range setLocalValue.List() {
 					hashCodeLocal := hashComplexObject(v2)
-					log.Printf("[INFO] properties: %s", property.String())
-					log.Printf("[INFO] remote: %s %d", v1, hashCodeRemote)
-					log.Printf("[INFO] local: %s %d", v2, hashCodeLocal)
+					//log.Printf("[INFO] properties: %s", property.String())
+					//log.Printf("[INFO] remote: %s %d", v1, hashCodeRemote)
+					//log.Printf("[INFO] local: %s %d", v2, hashCodeLocal)
 					if hashCodeLocal == hashCodeRemote {
 						objectValue, err := convertObjectToLocalStateData(property, v1, v2)
 						matched = true
@@ -465,10 +465,10 @@ func convertPayloadToLocalStateDataValue(property *SpecSchemaDefinitionProperty,
 					}
 				}
 				if matched == false {
-					log.Printf("[INFO] properties: %s", property.String())
-					log.Printf("[INFO] remote: %s %d", v1, hashCodeRemote)
+					//log.Printf("[INFO] properties: %s", property.String())
+					//log.Printf("[INFO] remote: %s %d", v1, hashCodeRemote)
 					objectValue, err := convertObjectToLocalStateData(property, v1, nil)
-					log.Printf("[INFO] object Value: %s", objectValue)
+					//log.Printf("[INFO] object Value: %s", objectValue)
 					matched = true
 					if err != nil {
 						return err, nil
@@ -476,6 +476,8 @@ func convertPayloadToLocalStateDataValue(property *SpecSchemaDefinitionProperty,
 					setInput.Add(objectValue)
 				}
 			}
+			//log.Printf("[INFO] setInput: %s", setInput)
+
 			return setInput, nil
 		}
 		return nil, fmt.Errorf("property '%s' is supposed to be an set objects", property.Name)
@@ -515,6 +517,7 @@ func convertObjectToLocalStateData(property *SpecSchemaDefinitionProperty, prope
 	if propertyValue != nil {
 		mapValue = propertyValue.(map[string]interface{})
 	}
+	//log.Printf("[INFO] mapValue: %s", mapValue)
 
 	localStateMapValue := make(map[string]interface{})
 	if propertyLocalStateValue != nil {
@@ -528,11 +531,10 @@ func convertObjectToLocalStateData(property *SpecSchemaDefinitionProperty, prope
 	for _, schemaDefinitionProperty := range property.SpecSchemaDefinition.Properties {
 		propertyName := schemaDefinitionProperty.Name
 		propertyValue := mapValue[propertyName]
-
+		//log.Printf("[INFO] property name and remoteValue: %s %s %s", propertyName, propertyValue, localStateMapValue[propertyName])
 		// Here we are processing the items of the list which are objects. In this case we need to keep the original
 		// types as Terraform honors property types for resource schemas attached to TypeList properties
 		propValue, err := convertPayloadToLocalStateDataValue(schemaDefinitionProperty, propertyValue, localStateMapValue[propertyName], false)
-		log.Printf("[INFO] propValue: %s", propValue)
 		if err != nil {
 			return nil, err
 		}
