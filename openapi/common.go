@@ -445,7 +445,7 @@ func convertPayloadToLocalStateDataValue(property *SpecSchemaDefinitionProperty,
 			if err != nil {
 				return err, nil
 			}
-			//log.Printf("[INFO] setValue: %s", setValue)
+			log.Printf("[INFO] setValue: %s", setValue)
 			for _, v1 := range setValue.(*schema.Set).List() {
 				// Do something with v
 				hashCodeRemote := hashComplexObject(v1)
