@@ -302,46 +302,6 @@ func deepConvertArrayToSet(property *SpecSchemaDefinitionProperty, v interface{}
 	}
 }
 
-func deepConvertArrayToSetMap(properties []*SpecSchemaDefinitionProperty, object interface{}) (interface{}, error) {
-	outerMap, ok := object.(map[string]interface{})
-	if !ok {
-		return nil, fmt.Errorf("object is not a map")
-	}
-
-	// Since outerMap has only one element, we can get that element directly
-	for outerKey, innerObject := range outerMap {
-		switch innerMap := innerObject.(type) {
-		case map[string]interface{}:
-			// For maps, create a new map and convert each value in the map
-			newMap := make(map[string]interface{})
-			for key, value := range innerMap {
-				//log.Printf("[INFO] key,value %s %s", key, value)
-				for _, property := range properties {
-					if key == property.Name {
-						//log.Printf("[INFO] key,value %s %s", key, value)
-						if property.isSetOfObjectsProperty() {
-							//log.Printf("[INFO] key,value %s %s", key, value)
-							convertedValue, err := deepConvertArrayToSet(property, value)
-							if err != nil {
-								return nil, err
-							}
-							newMap[key] = convertedValue.(*schema.Set)
-						} else {
-							newMap[key] = value
-						}
-					}
-				}
-			}
-			outerMap[outerKey] = newMap
-		default:
-			// For other types, return the value as is
-			outerMap[outerKey] = innerObject
-		}
-	}
-	//log.Printf("[INFO] output of deep copy map %s %s %s", properties, object, outerMap)
-	return outerMap, nil
-}
-
 func deepConvertArrayToSetMapNew(properties []*SpecSchemaDefinitionProperty, object interface{}) (interface{}, error) {
 	//log.Printf("[INFO] input of deep copy map %s %s", properties, object)
 	inputMap, ok := object.(map[string]interface{})
@@ -423,63 +383,98 @@ func convertPayloadToLocalStateDataValue(property *SpecSchemaDefinitionProperty,
 			return propertyValue, nil
 		}
 		if property.isSetOfObjectsProperty() {
-			setInput := schema.NewSet(hashComplexObject, []interface{}{})
-			var setValue interface{}
-			var err error
-			if isFromAPI {
-				arrayValue := make([]interface{}, 0)
-				if propertyValue != nil {
-					arrayValue = propertyValue.([]interface{})
-				}
-				setValue, err = deepConvertArrayToSet(property, arrayValue)
-			} else {
-				setValue = propertyValue
-			}
-			//log.Printf("[INFO] arrayValue: %s", arrayValue)
-			var setLocalValue *schema.Set
+			arrayInput := []interface{}{}
 
-			if propertyLocalStateValue == nil {
-				setLocalValue = schema.NewSet(schema.HashString, []interface{}{})
-			} else {
-				setLocalValue = propertyLocalStateValue.(*schema.Set)
+			arrayValue := make([]interface{}, 0)
+			if propertyValue != nil {
+				arrayValue = propertyValue.([]interface{})
 			}
-			if err != nil {
-				return err, nil
+
+			localStateArrayValue := make([]interface{}, 0)
+			if propertyLocalStateValue != nil {
+				localStateArrayValue = propertyLocalStateValue.([]interface{})
 			}
-			log.Printf("[INFO] setValue: %s", setValue)
-			for _, v1 := range setValue.(*schema.Set).List() {
-				// Do something with v
-				hashCodeRemote := hashComplexObject(v1)
+			for _, remoteVal := range arrayValue {
+				hashCodeRemote := hashComplexObject(remoteVal)
 				matched := false
-				for _, v2 := range setLocalValue.List() {
-					hashCodeLocal := hashComplexObject(v2)
-					//log.Printf("[INFO] properties: %s", property.String())
-					//log.Printf("[INFO] remote: %s %d", v1, hashCodeRemote)
-					//log.Printf("[INFO] local: %s %d", v2, hashCodeLocal)
+				for _, localVal := range localStateArrayValue {
+					hashCodeLocal := hashComplexObject(localVal)
 					if hashCodeLocal == hashCodeRemote {
-						objectValue, err := convertObjectToLocalStateData(property, v1, v2)
-						matched = true
+						objectValue, err := convertObjectToLocalStateData(property, remoteVal, localVal)
 						if err != nil {
 							return err, nil
 						}
-						setInput.Add(objectValue)
+						matched = true
+						arrayInput = append(arrayInput, objectValue)
 					}
-				}
-				if matched == false {
-					//log.Printf("[INFO] properties: %s", property.String())
-					//log.Printf("[INFO] remote: %s %d", v1, hashCodeRemote)
-					objectValue, err := convertObjectToLocalStateData(property, v1, nil)
-					//log.Printf("[INFO] object Value: %s", objectValue)
-					matched = true
-					if err != nil {
-						return err, nil
+					if matched == false {
+						objectValue, err := convertObjectToLocalStateData(property, remoteVal, nil)
+						if err != nil {
+							return err, nil
+						}
+						arrayInput = append(arrayInput, objectValue)
 					}
-					setInput.Add(objectValue)
 				}
 			}
+			return arrayInput, nil
+			//if property.isSetOfObjectsProperty() {
+			//	setInput := schema.NewSet(hashComplexObject, []interface{}{})
+			//	var setValue interface{}
+			//	var err error
+			//	if isFromAPI {
+			//		arrayValue := make([]interface{}, 0)
+			//		if propertyValue != nil {
+			//			arrayValue = propertyValue.([]interface{})
+			//		}
+			//		setValue, err = deepConvertArrayToSet(property, arrayValue)
+			//	} else {
+			//		setValue = propertyValue
+			//	}
+			//	//log.Printf("[INFO] arrayValue: %s", arrayValue)
+			//	var setLocalValue *schema.Set
+			//
+			//	if propertyLocalStateValue == nil {
+			//		setLocalValue = schema.NewSet(schema.HashString, []interface{}{})
+			//	} else {
+			//		setLocalValue = propertyLocalStateValue.(*schema.Set)
+			//	}
+			//	if err != nil {
+			//		return err, nil
+			//	}
+			//	log.Printf("[INFO] setValue: %s", setValue)
+			//	for _, v1 := range setValue.(*schema.Set).List() {
+			//		// Do something with v
+			//		hashCodeRemote := hashComplexObject(v1)
+			//		matched := false
+			//		for _, v2 := range setLocalValue.List() {
+			//			hashCodeLocal := hashComplexObject(v2)
+			//			//log.Printf("[INFO] properties: %s", property.String())
+			//			//log.Printf("[INFO] remote: %s %d", v1, hashCodeRemote)
+			//			//log.Printf("[INFO] local: %s %d", v2, hashCodeLocal)
+			//			if hashCodeLocal == hashCodeRemote {
+			//				objectValue, err := convertObjectToLocalStateData(property, v1, v2)
+			//				matched = true
+			//				if err != nil {
+			//					return err, nil
+			//				}
+			//				setInput.Add(objectValue)
+			//			}
+			//		}
+			//		if matched == false {
+			//			//log.Printf("[INFO] properties: %s", property.String())
+			//			//log.Printf("[INFO] remote: %s %d", v1, hashCodeRemote)
+			//			objectValue, err := convertObjectToLocalStateData(property, v1, nil)
+			//			//log.Printf("[INFO] object Value: %s", objectValue)
+			//			matched = true
+			//			if err != nil {
+			//				return err, nil
+			//			}
+			//			setInput.Add(objectValue)
+			//		}
+			//	}
 			//log.Printf("[INFO] setInput: %s", setInput)
-
-			return setInput, nil
+			//
+			//return setInput, nil
 		}
 		return nil, fmt.Errorf("property '%s' is supposed to be an set objects", property.Name)
 	case TypeString:
