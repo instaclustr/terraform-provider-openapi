@@ -1,8 +1,10 @@
 package openapi
 
 import (
+	"bytes"
 	"fmt"
 	"github.com/hashicorp/go-cty/cty"
+	"github.com/hashicorp/terraform-plugin-sdk/helper/hashcode"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"reflect"
 
@@ -290,6 +292,7 @@ func (s *SpecSchemaDefinitionProperty) terraformSchema() (*schema.Schema, error)
 			return nil, err
 		}
 		terraformSchema.Elem = objectSchema
+		terraformSchema.Set =
 
 	case TypeList:
 		if isListOfPrimitives, elemSchema := s.isTerraformListOfSimpleValues(); isListOfPrimitives {
@@ -311,6 +314,7 @@ func (s *SpecSchemaDefinitionProperty) terraformSchema() (*schema.Schema, error)
 				return nil, err
 			}
 			terraformSchema.Elem = objectSchema
+			terraformSchema.Set = hashObject
 		}
 	}
 
@@ -353,6 +357,13 @@ func (s *SpecSchemaDefinitionProperty) terraformSchema() (*schema.Schema, error)
 	}
 
 	return terraformSchema, nil
+}
+
+func hashObject(v interface{}) int {
+	var buf bytes.Buffer
+	m := v.(map[string]interface{})
+	buf.WriteString(fmt.Sprintf("%s-", m["name"].(string)))
+	return hashcode.String(buf.String())
 }
 
 func (s *SpecSchemaDefinitionProperty) validateDiagFunc() schema.SchemaValidateDiagFunc {
