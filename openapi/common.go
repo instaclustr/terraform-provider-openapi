@@ -382,7 +382,7 @@ func convertPayloadToLocalStateDataValue(property *SpecSchemaDefinitionProperty,
 	switch property.Type {
 	case TypeObject:
 		return convertObjectToLocalStateData(property, propertyValue, propertyLocalStateValue)
-	case TypeList:
+	case TypeList, TypeSet:
 		if isListOfPrimitives, _ := property.isTerraformListOfSimpleValues(); isListOfPrimitives {
 			return propertyValue, nil
 		}
@@ -417,71 +417,71 @@ func convertPayloadToLocalStateDataValue(property *SpecSchemaDefinitionProperty,
 			return arrayInput, nil
 		}
 		return nil, fmt.Errorf("property '%s' is supposed to be an array objects", property.Name)
-	case TypeSet:
-		//log.Printf("[INFO] ofTypeSet1")
-		if isSetOfPrimitives, _ := property.isTerraformSetOfSimpleValues(); isSetOfPrimitives {
-			return propertyValue, nil
-		}
-		if property.isSetOfObjectsProperty() {
-			setInput := schema.NewSet(hashComplexObject, []interface{}{})
-			var setValue interface{}
-			var err error
-			if isFromAPI {
-				arrayValue := make([]interface{}, 0)
-				if propertyValue != nil {
-					arrayValue = propertyValue.([]interface{})
-				}
-				setValue, err = deepConvertArrayToSet(property, arrayValue)
-			} else {
-				setValue = propertyValue
-			}
-			//log.Printf("[INFO] arrayValue: %s", arrayValue)
-			var setLocalValue *schema.Set
-
-			if propertyLocalStateValue == nil {
-				setLocalValue = schema.NewSet(schema.HashString, []interface{}{})
-			} else {
-				setLocalValue = propertyLocalStateValue.(*schema.Set)
-			}
-			if err != nil {
-				return err, nil
-			}
-			log.Printf("[INFO] setValue: %s", setValue)
-			for _, v1 := range setValue.(*schema.Set).List() {
-				// Do something with v
-				hashCodeRemote := hashComplexObject(v1)
-				matched := false
-				for _, v2 := range setLocalValue.List() {
-					hashCodeLocal := hashComplexObject(v2)
-					//log.Printf("[INFO] properties: %s", property.String())
-					//log.Printf("[INFO] remote: %s %d", v1, hashCodeRemote)
-					//log.Printf("[INFO] local: %s %d", v2, hashCodeLocal)
-					if hashCodeLocal == hashCodeRemote {
-						objectValue, err := convertObjectToLocalStateData(property, v1, v2)
-						matched = true
-						if err != nil {
-							return err, nil
-						}
-						setInput.Add(objectValue)
-					}
-				}
-				if matched == false {
-					//log.Printf("[INFO] properties: %s", property.String())
-					//log.Printf("[INFO] remote: %s %d", v1, hashCodeRemote)
-					objectValue, err := convertObjectToLocalStateData(property, v1, nil)
-					//log.Printf("[INFO] object Value: %s", objectValue)
-					matched = true
-					if err != nil {
-						return err, nil
-					}
-					setInput.Add(objectValue)
-				}
-			}
-			//log.Printf("[INFO] setInput: %s", setInput)
-
-			return setInput, nil
-		}
-		return nil, fmt.Errorf("property '%s' is supposed to be an set objects", property.Name)
+	//case TypeSet:
+	//	//log.Printf("[INFO] ofTypeSet1")
+	//	if isSetOfPrimitives, _ := property.isTerraformSetOfSimpleValues(); isSetOfPrimitives {
+	//		return propertyValue, nil
+	//	}
+	//	if property.isSetOfObjectsProperty() {
+	//		setInput := schema.NewSet(hashComplexObject, []interface{}{})
+	//		var setValue interface{}
+	//		var err error
+	//		if isFromAPI {
+	//			arrayValue := make([]interface{}, 0)
+	//			if propertyValue != nil {
+	//				arrayValue = propertyValue.([]interface{})
+	//			}
+	//			setValue, err = deepConvertArrayToSet(property, arrayValue)
+	//		} else {
+	//			setValue = propertyValue
+	//		}
+	//		//log.Printf("[INFO] arrayValue: %s", arrayValue)
+	//		var setLocalValue *schema.Set
+	//
+	//		if propertyLocalStateValue == nil {
+	//			setLocalValue = schema.NewSet(schema.HashString, []interface{}{})
+	//		} else {
+	//			setLocalValue = propertyLocalStateValue.(*schema.Set)
+	//		}
+	//		if err != nil {
+	//			return err, nil
+	//		}
+	//		log.Printf("[INFO] setValue: %s", setValue)
+	//		for _, v1 := range setValue.(*schema.Set).List() {
+	//			// Do something with v
+	//			hashCodeRemote := hashComplexObject(v1)
+	//			matched := false
+	//			for _, v2 := range setLocalValue.List() {
+	//				hashCodeLocal := hashComplexObject(v2)
+	//				//log.Printf("[INFO] properties: %s", property.String())
+	//				//log.Printf("[INFO] remote: %s %d", v1, hashCodeRemote)
+	//				//log.Printf("[INFO] local: %s %d", v2, hashCodeLocal)
+	//				if hashCodeLocal == hashCodeRemote {
+	//					objectValue, err := convertObjectToLocalStateData(property, v1, v2)
+	//					matched = true
+	//					if err != nil {
+	//						return err, nil
+	//					}
+	//					setInput.Add(objectValue)
+	//				}
+	//			}
+	//			if matched == false {
+	//				//log.Printf("[INFO] properties: %s", property.String())
+	//				//log.Printf("[INFO] remote: %s %d", v1, hashCodeRemote)
+	//				objectValue, err := convertObjectToLocalStateData(property, v1, nil)
+	//				//log.Printf("[INFO] object Value: %s", objectValue)
+	//				matched = true
+	//				if err != nil {
+	//					return err, nil
+	//				}
+	//				setInput.Add(objectValue)
+	//			}
+	//		}
+	//		//log.Printf("[INFO] setInput: %s", setInput)
+	//
+	//		return setInput, nil
+	//	}
+	//	return nil, fmt.Errorf("property '%s' is supposed to be an set objects", property.Name)
 	case TypeString:
 		if propertyValue == nil {
 			return nil, nil
