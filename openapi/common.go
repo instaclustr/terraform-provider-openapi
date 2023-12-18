@@ -390,14 +390,17 @@ func convertPayloadToLocalStateDataValue(property *SpecSchemaDefinitionProperty,
 				arrayValue = propertyValue.([]interface{})
 			}
 
-			localStateArrayValue := make([]interface{}, 0)
-			if propertyLocalStateValue != nil {
-				localStateArrayValue = propertyLocalStateValue.([]interface{})
+			var setLocalValue *schema.Set
+
+			if propertyLocalStateValue == nil {
+				setLocalValue = schema.NewSet(schema.HashString, []interface{}{})
+			} else {
+				setLocalValue = propertyLocalStateValue.(*schema.Set)
 			}
 			for _, remoteVal := range arrayValue {
 				hashCodeRemote := hashComplexObject(remoteVal)
 				matched := false
-				for _, localVal := range localStateArrayValue {
+				for _, localVal := range setLocalValue.List() {
 					hashCodeLocal := hashComplexObject(localVal)
 					if hashCodeLocal == hashCodeRemote {
 						objectValue, err := convertObjectToLocalStateData(property, remoteVal, localVal)
