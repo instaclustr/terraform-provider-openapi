@@ -304,7 +304,6 @@ func (s *SpecSchemaDefinitionProperty) terraformSchema() (*schema.Schema, error)
 			}
 			terraformSchema.Elem = objectSchema
 		}
-
 	case TypeSet:
 		if isSetOfPrimitives, elemSchema := s.isTerraformSetOfSimpleValues(); isSetOfPrimitives {
 			terraformSchema.Elem = elemSchema
