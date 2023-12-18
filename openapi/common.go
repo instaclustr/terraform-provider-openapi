@@ -140,6 +140,7 @@ func updateStateWithPayloadDataAndOptions(openAPIResource SpecResource, remoteDa
 		}
 
 		value, err := convertPayloadToLocalStateDataValue(property, propValue, propertyLocalStateValue, true)
+
 		if err != nil {
 			return err
 		}
@@ -535,6 +536,7 @@ func convertObjectToLocalStateData(property *SpecSchemaDefinitionProperty, prope
 		// Here we are processing the items of the list which are objects. In this case we need to keep the original
 		// types as Terraform honors property types for resource schemas attached to TypeList properties
 		propValue, err := convertPayloadToLocalStateDataValue(schemaDefinitionProperty, propertyValue, localStateMapValue[propertyName], false)
+
 		if err != nil {
 			return nil, err
 		}
@@ -554,6 +556,7 @@ func convertObjectToLocalStateData(property *SpecSchemaDefinitionProperty, prope
 
 // setResourceDataProperty sets the expectedValue for the given schemaDefinitionPropertyName using the terraform compliant property name
 func setResourceDataProperty(schemaDefinitionProperty SpecSchemaDefinitionProperty, value interface{}, resourceLocalData *schema.ResourceData) error {
+	log.Printf("[INFO] setValue: %s", value)
 	return resourceLocalData.Set(schemaDefinitionProperty.GetTerraformCompliantPropertyName(), value)
 }
 
