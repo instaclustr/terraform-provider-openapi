@@ -6,7 +6,9 @@ import (
 	"github.com/hashicorp/go-cty/cty"
 	"github.com/hashicorp/terraform-plugin-sdk/helper/hashcode"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
+	"log"
 	"reflect"
+	"sort"
 
 	"github.com/dikhan/terraform-provider-openapi/v3/openapi/terraformutils"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
@@ -357,13 +359,45 @@ func (s *SpecSchemaDefinitionProperty) terraformSchema() (*schema.Schema, error)
 	return terraformSchema, nil
 }
 
-func hashObject(v interface{}) int {
-	var buf bytes.Buffer
-	m := v.(map[string]interface{})
-	buf.WriteString(fmt.Sprintf("%s-", m["name"].(string)))
-	return hashcode.String(buf.String())
-}
+//func hashObject(v interface{}) int {
+//	var buf bytes.Buffer
+//	m := v.(map[string]interface{})
+//	buf.WriteString(fmt.Sprintf("%s-", m["name"].(string)))
+//	return hashcode.String(buf.String())
+//}
 
+func hashObject(v interface{}) int {
+	var buffer bytes.Buffer
+	log.Printf("[INFO] hashInput: %s", v)
+	switch v := v.(type) {
+	case map[string]interface{}:
+		// Sort the keys so that the order is consistent
+		var keys []string
+		for k := range v {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+
+		// Hash each key-value pair
+		for _, k := range keys {
+			buffer.WriteString(k)
+			buffer.WriteString(fmt.Sprintf("%v", hashComplexObject(v[k])))
+		}
+	case []interface{}:
+		// Hash each element in the slice
+		for _, elem := range v {
+			buffer.WriteString(fmt.Sprintf("%v", hashComplexObject(elem)))
+		}
+	default:
+		// For primitive types, just write the value to the buffer
+		buffer.WriteString(fmt.Sprintf("%v", v))
+	}
+
+	// Compute and return the hash of the concatenated string
+	log.Printf("[INFO] hashOutput: %s", buffer.String())
+
+	return hashcode.String(buffer.String())
+}
 func (s *SpecSchemaDefinitionProperty) validateDiagFunc() schema.SchemaValidateDiagFunc {
 	return func(v interface{}, p cty.Path) diag.Diagnostics {
 		_, errs := s.validateFunc()(v, "") // it's not clear what would be the value of k with the new schema.SchemaValidateDiagFunc and whether it can be extracted from the cty.Path
