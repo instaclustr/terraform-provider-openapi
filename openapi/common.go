@@ -556,7 +556,7 @@ func convertObjectToLocalStateData(property *SpecSchemaDefinitionProperty, prope
 
 // setResourceDataProperty sets the expectedValue for the given schemaDefinitionPropertyName using the terraform compliant property name
 func setResourceDataProperty(schemaDefinitionProperty SpecSchemaDefinitionProperty, value interface{}, resourceLocalData *schema.ResourceData) error {
-	log.Printf("[INFO] setValue: %s", value)
+	log.Printf("[INFO] lastValue: %s", value)
 	return resourceLocalData.Set(schemaDefinitionProperty.GetTerraformCompliantPropertyName(), value)
 }
 
