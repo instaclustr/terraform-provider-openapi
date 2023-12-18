@@ -410,13 +410,13 @@ func convertPayloadToLocalStateDataValue(property *SpecSchemaDefinitionProperty,
 						matched = true
 						arrayInput = append(arrayInput, objectValue)
 					}
-					if matched == false {
-						objectValue, err := convertObjectToLocalStateData(property, remoteVal, nil)
-						if err != nil {
-							return err, nil
-						}
-						arrayInput = append(arrayInput, objectValue)
+				}
+				if matched == false {
+					objectValue, err := convertObjectToLocalStateData(property, remoteVal, nil)
+					if err != nil {
+						return err, nil
 					}
+					arrayInput = append(arrayInput, objectValue)
 				}
 			}
 			return arrayInput, nil
