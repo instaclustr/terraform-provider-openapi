@@ -292,7 +292,6 @@ func (s *SpecSchemaDefinitionProperty) terraformSchema() (*schema.Schema, error)
 			return nil, err
 		}
 		terraformSchema.Elem = objectSchema
-		terraformSchema.Set =
 
 	case TypeList:
 		if isListOfPrimitives, elemSchema := s.isTerraformListOfSimpleValues(); isListOfPrimitives {
