@@ -376,14 +376,14 @@ func hashObjectNew(s interface{}) int {
 	return hashcode.String(buffer.String())
 }
 
-func hashExampleWithSchema(schema *schema.Resource) schema.SchemaSetFunc {
+func hashExampleWithSchema(objectSchema *schema.Resource) schema.SchemaSetFunc {
 	return func(v interface{}) int {
 		// You can access the schema here...
 		//log.Printf("[INFO] schema: %s", schema.Schema)
 		log.Printf("[INFO] set: %s", v)
 		valueMap := v.(map[string]interface{})
-		objectSchema := schema.Schema
-		filteredSchema := make(map[string]interface{})
+		objectSchema := objectSchema.Schema
+		filteredSchema := map[string]*schema.Schema{}
 		filterValueMap := make(map[string]interface{})
 		for key, value := range objectSchema {
 			//fmt.Printf("Key: %s, Value: %v\n", key, value)
