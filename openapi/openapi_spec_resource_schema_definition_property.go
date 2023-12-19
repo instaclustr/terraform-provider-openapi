@@ -380,12 +380,12 @@ func hashExampleWithSchema(schema *schema.Resource) schema.SchemaSetFunc {
 	return func(v interface{}) int {
 		// You can access the schema here...
 		//log.Printf("[INFO] schema: %s", schema.Schema)
-		//log.Printf("[INFO] set: %s", v)
+		log.Printf("[INFO] set: %s", v)
 		objectSchema := schema.Schema
 		for key, value := range objectSchema {
 			//fmt.Printf("Key: %s, Value: %v\n", key, value)
 			if reflect.TypeOf(key).Kind() == reflect.String {
-				fmt.Printf("Key: %s, Value: %v\n", key, value)
+				fmt.Printf("Key: %s, Value: %v\n", key, value.Computed, value.Type)
 			}
 		}
 		var buf bytes.Buffer
