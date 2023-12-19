@@ -384,11 +384,14 @@ func hashExampleWithSchema(objectSchema *schema.Resource) schema.SchemaSetFunc {
 		valueMap := v.(map[string]interface{})
 		objectSchema := objectSchema.Schema
 		filteredSchema := map[string]*schema.Schema{}
+		filteredSchemaWrong := map[string]*schema.Schema{}
 		filterValueMap := make(map[string]interface{})
 		for key, value := range objectSchema {
 			//fmt.Printf("Key: %s, Value: %v\n", key, value)
 			if value.Computed == false {
 				filteredSchema[key] = value
+			} else {
+				filteredSchemaWrong[key] = value
 			}
 			//fmt.Printf("Key: %s Type: %v Computed: %s Value: %s \n ", key, value.Computed, value.Type, valueMap[key])
 		}
@@ -400,6 +403,12 @@ func hashExampleWithSchema(objectSchema *schema.Resource) schema.SchemaSetFunc {
 			//fmt.Printf("Key: %s Type: %v Computed: %s Value: %s \n ", key, value.Computed, value.Type, valueMap[key])
 		}
 		for key, value := range filteredSchema {
+			//fmt.Printf("Key: %s, Value: %v\n", key, value)
+			fmt.Printf("Key: %s Type: %v Computed: %s Value: %s \n ", key, value.Type, value.Computed, valueMap[key])
+		}
+		fmt.Printf("-------------------")
+
+		for key, value := range filteredSchemaWrong {
 			//fmt.Printf("Key: %s, Value: %v\n", key, value)
 			fmt.Printf("Key: %s Type: %v Computed: %s Value: %s \n ", key, value.Type, value.Computed, valueMap[key])
 		}
