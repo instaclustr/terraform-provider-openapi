@@ -399,7 +399,7 @@ func hashExampleWithSchema(schema *schema.Resource) schema.SchemaSetFunc {
 			}
 			//fmt.Printf("Key: %s Type: %v Computed: %s Value: %s \n ", key, value.Computed, value.Type, valueMap[key])
 		}
-		for key, value := range objectSchema {
+		for key, value := range filteredSchema {
 			//fmt.Printf("Key: %s, Value: %v\n", key, value)
 			fmt.Printf("Key: %s Type: %v Computed: %s Value: %s \n ", key, value.Type, value.Computed, valueMap[key])
 		}
