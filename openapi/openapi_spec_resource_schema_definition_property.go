@@ -383,11 +383,25 @@ func hashExampleWithSchema(schema *schema.Resource) schema.SchemaSetFunc {
 		log.Printf("[INFO] set: %s", v)
 		valueMap := v.(map[string]interface{})
 		objectSchema := schema.Schema
+		filteredSchema := make(map[string]interface{})
+		filterValueMap := make(map[string]interface{})
 		for key, value := range objectSchema {
 			//fmt.Printf("Key: %s, Value: %v\n", key, value)
-			if reflect.TypeOf(key).Kind() == reflect.String {
-				fmt.Printf("Key: %s Type: %v Computed: %s Value: \n ", key, value.Computed, value.Type, valueMap[key])
+			if value.Computed == false {
+				filteredSchema[key] = value
 			}
+			//fmt.Printf("Key: %s Type: %v Computed: %s Value: %s \n ", key, value.Computed, value.Type, valueMap[key])
+		}
+		for key, value := range valueMap {
+			fmt.Printf("Key: %s, Value: %v\n", key, value)
+			if value != nil {
+				filterValueMap[key] = value
+			}
+			//fmt.Printf("Key: %s Type: %v Computed: %s Value: %s \n ", key, value.Computed, value.Type, valueMap[key])
+		}
+		for key, value := range objectSchema {
+			//fmt.Printf("Key: %s, Value: %v\n", key, value)
+			fmt.Printf("Key: %s Type: %v Computed: %s Value: %s \n ", key, value.Type, value.Computed, valueMap[key])
 		}
 		var buf bytes.Buffer
 		//m := v.(map[string]interface{})
