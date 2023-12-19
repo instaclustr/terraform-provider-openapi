@@ -367,8 +367,8 @@ func (s *SpecSchemaDefinitionProperty) terraformSchema() (*schema.Schema, error)
 //	}
 func hashObjectNew(s interface{}) int {
 	var buffer bytes.Buffer
-	objectSchema := s.(map[string]SpecSchemaDefinitionProperty)
-	log.Printf("[INFO] hashInput: %s", objectSchema)
+	//objectSchema := s.(map[string]SpecSchemaDefinitionProperty)
+	log.Printf("[INFO] hashInput: %s", s)
 	//log.Printf("[INFO] hashType: %s", objectSchema.Type)
 	if s == false {
 		return hashcode.String(buffer.String())
