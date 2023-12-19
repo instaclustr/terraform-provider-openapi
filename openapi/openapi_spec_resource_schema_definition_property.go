@@ -314,7 +314,7 @@ func (s *SpecSchemaDefinitionProperty) terraformSchema() (*schema.Schema, error)
 				return nil, err
 			}
 			terraformSchema.Elem = objectSchema
-			terraformSchema.Set = hashObject
+			terraformSchema.Set = hashObjectNew
 		}
 	}
 
@@ -359,13 +359,22 @@ func (s *SpecSchemaDefinitionProperty) terraformSchema() (*schema.Schema, error)
 	return terraformSchema, nil
 }
 
-//func hashObject(v interface{}) int {
-//	var buf bytes.Buffer
-//	m := v.(map[string]interface{})
-//	buf.WriteString(fmt.Sprintf("%s-", m["name"].(string)))
-//	return hashcode.String(buf.String())
-//}
-
+//	func hashObject(v interface{}) int {
+//		var buf bytes.Buffer
+//		m := v.(map[string]interface{})
+//		buf.WriteString(fmt.Sprintf("%s-", m["name"].(string)))
+//		return hashcode.String(buf.String())
+//	}
+func hashObjectNew(s interface{}) int {
+	var buffer bytes.Buffer
+	objectSchema := s.(SpecSchemaDefinitionProperty)
+	log.Printf("[INFO] hashInput: %s", objectSchema)
+	log.Printf("[INFO] hashType: %s", objectSchema.Type)
+	if s == false {
+		return hashcode.String(buffer.String())
+	}
+	return hashcode.String(buffer.String())
+}
 func hashObject(v interface{}) int {
 	var buffer bytes.Buffer
 	log.Printf("[INFO] hashInput: %s", v)
