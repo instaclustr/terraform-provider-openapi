@@ -376,7 +376,7 @@ func hashExampleWithSchema(objectSchema *schema.Resource) schema.SchemaSetFunc {
 		for key, value := range objectSchema {
 			//fmt.Printf("Key: %s, Value: %v\n", key, value)
 			//value := value.(*SpecSchemaDefinitionProperty)
-			if value.Computed == false && value.Required == true {
+			if value.Computed == false {
 				filteredSchema[key] = value
 			}
 			//fmt.Printf("Key: %s Type: %v Computed: %s Value: %s \n ", key, value.Computed, value.Type, valueMap[key])
