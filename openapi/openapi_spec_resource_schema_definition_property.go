@@ -381,13 +381,13 @@ func hashExampleWithSchema(objectSchema *schema.Resource) schema.SchemaSetFunc {
 			}
 			//fmt.Printf("Key: %s Type: %v Computed: %s Value: %s \n ", key, value.Computed, value.Type, valueMap[key])
 		}
-		for key, value := range valueMap {
-			//fmt.Printf("Key: %s, Value: %v\n", key, value)
-			if value != nil {
-				filterValueMap[key] = value
-			}
-			//fmt.Printf("Key: %s Type: %v Computed: %s Value: %s \n ", key, value.Computed, value.Type, valueMap[key])
-		}
+		//for key, value := range valueMap {
+		//	//fmt.Printf("Key: %s, Value: %v\n", key, value)
+		//	if value != nil {
+		//		filterValueMap[key] = value
+		//	}
+		//	//fmt.Printf("Key: %s Type: %v Computed: %s Value: %s \n ", key, value.Computed, value.Type, valueMap[key])
+		//}
 		for key, _ := range filteredSchema {
 			//fmt.Printf("Key: %s, Value: %v\n", key, value)
 			filterValueMap[key] = valueMap[key]
