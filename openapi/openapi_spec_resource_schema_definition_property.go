@@ -153,6 +153,10 @@ func (s *SpecSchemaDefinitionProperty) IsRequired() bool {
 	return s.Required
 }
 
+func (s *SpecSchemaDefinitionProperty) IsImmutable() bool {
+	return s.Immutable
+}
+
 func (s *SpecSchemaDefinitionProperty) isOptional() bool {
 	return !s.Required
 }
@@ -384,14 +388,13 @@ func hashExampleWithSchema(objectSchema *schema.Resource) schema.SchemaSetFunc {
 		valueMap := v.(map[string]interface{})
 		objectSchema := objectSchema.Schema
 		filteredSchema := map[string]*schema.Schema{}
-		filteredSchemaWrong := map[string]*schema.Schema{}
+		//filteredSchemaWrong := map[string]*schema.Schema{}
 		filterValueMap := make(map[string]interface{})
 		for key, value := range objectSchema {
 			//fmt.Printf("Key: %s, Value: %v\n", key, value)
-			if value.Computed == false {
+			//value := value.(*SpecSchemaDefinitionProperty)
+			if value.Computed == false && value.Required == true {
 				filteredSchema[key] = value
-			} else {
-				filteredSchemaWrong[key] = value
 			}
 			//fmt.Printf("Key: %s Type: %v Computed: %s Value: %s \n ", key, value.Computed, value.Type, valueMap[key])
 		}
@@ -402,10 +405,10 @@ func hashExampleWithSchema(objectSchema *schema.Resource) schema.SchemaSetFunc {
 			}
 			//fmt.Printf("Key: %s Type: %v Computed: %s Value: %s \n ", key, value.Computed, value.Type, valueMap[key])
 		}
-		for key, value := range filteredSchema {
+		for key, _ := range filteredSchema {
 			//fmt.Printf("Key: %s, Value: %v\n", key, value)
 			filterValueMap[key] = valueMap[key]
-			fmt.Printf("Key: %s Type: %v Computed: %s Value: %s \n ", key, value.Type, value.Computed, valueMap[key])
+			//fmt.Printf("Key: %s Type: %v Computed: %s Value: %s \n ", key, value.Type, value.Computed, valueMap[key])
 		}
 		fmt.Printf("-------------------")
 		for key, value := range filterValueMap {
@@ -417,10 +420,10 @@ func hashExampleWithSchema(objectSchema *schema.Resource) schema.SchemaSetFunc {
 		//	//fmt.Printf("Key: %s, Value: %v\n", key, value)
 		//	fmt.Printf("Key: %s Type: %v Computed: %s Value: %s \n ", key, value.Type, value.Computed, valueMap[key])
 		//}
-		var buf bytes.Buffer
+		//var buf bytes.Buffer
 		//m := v.(map[string]interface{})
 		// buf.WriteString(fmt.Sprintf("%s-", m["attribute1"].(string)))
-		return hashcode.String(buf.String())
+		return hashObject(filterValueMap)
 	}
 }
 func hashObject(v interface{}) int {
