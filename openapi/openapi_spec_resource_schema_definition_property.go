@@ -379,7 +379,7 @@ func (s *SpecSchemaDefinitionProperty) terraformSchema() (*schema.Schema, error)
 func hashExampleWithSchema(schema *schema.Resource) schema.SchemaSetFunc {
 	return func(v interface{}) int {
 		// You can access the schema here...
-		log.Printf("[INFO] schema: %s", schema)
+		log.Printf("[INFO] schema: %s", schema.Schema)
 		log.Printf("[INFO] set: %s", v)
 		var buf bytes.Buffer
 		m := v.(map[string]interface{})
