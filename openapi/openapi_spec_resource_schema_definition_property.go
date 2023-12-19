@@ -363,23 +363,6 @@ func (s *SpecSchemaDefinitionProperty) terraformSchema() (*schema.Schema, error)
 	return terraformSchema, nil
 }
 
-//	func hashObject(v interface{}) int {
-//		var buf bytes.Buffer
-//		m := v.(map[string]interface{})
-//		buf.WriteString(fmt.Sprintf("%s-", m["name"].(string)))
-//		return hashcode.String(buf.String())
-//	}
-func hashObjectNew(s interface{}) int {
-	var buffer bytes.Buffer
-	objectSchema := s.(map[string]SpecSchemaDefinitionProperty)
-	log.Printf("[INFO] hashInput: %s", objectSchema)
-	//log.Printf("[INFO] hashType: %s", objectSchema.Type)
-	if s == false {
-		return hashcode.String(buffer.String())
-	}
-	return hashcode.String(buffer.String())
-}
-
 func hashExampleWithSchema(objectSchema *schema.Resource) schema.SchemaSetFunc {
 	return func(v interface{}) int {
 		// You can access the schema here...
@@ -408,14 +391,15 @@ func hashExampleWithSchema(objectSchema *schema.Resource) schema.SchemaSetFunc {
 		for key, _ := range filteredSchema {
 			//fmt.Printf("Key: %s, Value: %v\n", key, value)
 			filterValueMap[key] = valueMap[key]
+			fmt.Printf("Key: %s Value %s", key, valueMap[key])
 			//fmt.Printf("Key: %s Type: %v Computed: %s Value: %s \n ", key, value.Type, value.Computed, valueMap[key])
 		}
 		fmt.Printf("-------------------")
-		for key, value := range filterValueMap {
-			//fmt.Printf("Key: %s, Value: %v\n", key, value)
-			filterValueMap[key] = valueMap[key]
-			fmt.Printf("Key: %s Value %s", key, value)
-		}
+		//for key, value := range filterValueMap {
+		//	//fmt.Printf("Key: %s, Value: %v\n", key, value)
+		//	filterValueMap[key] = valueMap[key]
+		//	fmt.Printf("Key: %s Value %s", key, value)
+		//}
 		//for key, value := range filteredSchemaWrong {
 		//	//fmt.Printf("Key: %s, Value: %v\n", key, value)
 		//	fmt.Printf("Key: %s Type: %v Computed: %s Value: %s \n ", key, value.Type, value.Computed, valueMap[key])
