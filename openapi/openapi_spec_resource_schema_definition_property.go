@@ -314,7 +314,7 @@ func (s *SpecSchemaDefinitionProperty) terraformSchema() (*schema.Schema, error)
 				return nil, err
 			}
 			terraformSchema.Elem = objectSchema
-			terraformSchema.Set = hashObjectNew
+			terraformSchema.Set = hashExampleWithSchema(objectSchema)
 		}
 	}
 
@@ -365,15 +365,27 @@ func (s *SpecSchemaDefinitionProperty) terraformSchema() (*schema.Schema, error)
 //		buf.WriteString(fmt.Sprintf("%s-", m["name"].(string)))
 //		return hashcode.String(buf.String())
 //	}
-func hashObjectNew(s interface{}) int {
-	var buffer bytes.Buffer
-	objectSchema := s.(map[string]SpecSchemaDefinitionProperty)
-	log.Printf("[INFO] hashInput: %s", objectSchema)
-	log.Printf("[INFO] hashType: %s", objectSchema.Type)
-	if s == false {
-		return hashcode.String(buffer.String())
+//func hashObjectNew(s interface{}) int {
+//	var buffer bytes.Buffer
+//	objectSchema := s.(map[string]SpecSchemaDefinitionProperty)
+//	log.Printf("[INFO] hashInput: %s", objectSchema)
+//	//log.Printf("[INFO] hashType: %s", objectSchema.Type)
+//	if s == false {
+//		return hashcode.String(buffer.String())
+//	}
+//	return hashcode.String(buffer.String())
+//}
+
+func hashExampleWithSchema(schema *schema.Resource) schema.SchemaSetFunc {
+	return func(v interface{}) int {
+		// You can access the schema here...
+		log.Printf("[INFO] schema: %s", schema)
+		log.Printf("[INFO] set: %s", v)
+		var buf bytes.Buffer
+		m := v.(map[string]interface{})
+		buf.WriteString(fmt.Sprintf("%s-", m["attribute1"].(string)))
+		return hashcode.String(buf.String())
 	}
-	return hashcode.String(buffer.String())
 }
 func hashObject(v interface{}) int {
 	var buffer bytes.Buffer
