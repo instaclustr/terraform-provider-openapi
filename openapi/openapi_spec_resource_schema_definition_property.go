@@ -391,10 +391,10 @@ func hashExampleWithSchema(objectSchema *schema.Resource) schema.SchemaSetFunc {
 		for key, _ := range filteredSchema {
 			//fmt.Printf("Key: %s, Value: %v\n", key, value)
 			filterValueMap[key] = valueMap[key]
-			fmt.Printf("Key: %s Value %s", key, valueMap[key])
+			//fmt.Printf("Key: %s Value %s", key, valueMap[key])
 			//fmt.Printf("Key: %s Type: %v Computed: %s Value: %s \n ", key, value.Type, value.Computed, valueMap[key])
 		}
-		fmt.Printf("-------------------")
+		//fmt.Printf("-------------------")
 		//for key, value := range filterValueMap {
 		//	//fmt.Printf("Key: %s, Value: %v\n", key, value)
 		//	filterValueMap[key] = valueMap[key]
