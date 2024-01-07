@@ -76,22 +76,6 @@ func (s *SpecSchemaDefinitionProperty) isPrimitiveProperty() bool {
 	return false
 }
 
-func (s *SpecSchemaDefinitionProperty) String1() string {
-	return fmt.Sprintf("Name: %s, Type: %s, Description: %s, Required: %v, ReadOnly: %v",
-		s.Name, s.Type, s.Description, s.Required, s.ReadOnly)
-}
-
-func (s *SpecSchemaDefinitionProperty) String() string {
-	var nestedProperties string
-	if s.SpecSchemaDefinition != nil {
-		for _, prop := range s.SpecSchemaDefinition.Properties {
-			nestedProperties += prop.String() + ", "
-		}
-	}
-	return fmt.Sprintf("Name: %s, Type: %s, Required: %v, ReadOnly: %v, Nested: [%s]",
-		s.Name, s.Type, s.Required, s.ReadOnly, nestedProperties)
-}
-
 // GetTerraformCompliantPropertyName returns the property name converted to a terraform compliant name if needed following the snake_case naming convention
 func (s *SpecSchemaDefinitionProperty) GetTerraformCompliantPropertyName() string {
 	if s.PreferredName != "" {
@@ -151,10 +135,6 @@ func (s *SpecSchemaDefinitionProperty) isReadOnly() bool {
 // IsRequired exposes whether a property is required
 func (s *SpecSchemaDefinitionProperty) IsRequired() bool {
 	return s.Required
-}
-
-func (s *SpecSchemaDefinitionProperty) IsImmutable() bool {
-	return s.Immutable
 }
 
 func (s *SpecSchemaDefinitionProperty) isOptional() bool {

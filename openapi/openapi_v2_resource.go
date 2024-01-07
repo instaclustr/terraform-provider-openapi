@@ -57,6 +57,7 @@ const extTfFieldStatus = "x-terraform-field-status"
 const extTfID = "x-terraform-id"
 const extTfComputed = "x-terraform-computed"
 const extTfIgnoreOrder = "x-terraform-ignore-order"
+const extTfSet = "x-terraform-set"
 const extIgnoreOrder = "x-ignore-order"
 const extTfWriteOnly = "x-terraform-write-only"
 
@@ -734,22 +735,13 @@ func (o *SpecV2Resource) isSetProperty(property spec.Schema) (bool, schemaDefini
 }
 
 func (o *SpecV2Resource) isArrayTypeProperty(property spec.Schema) bool {
-	if o.isOfType(property, "array") {
-		if o.isBoolExtensionEnabled(property.Extensions, extTfIgnoreOrder) || o.isBoolExtensionEnabled(property.Extensions, extIgnoreOrder) {
-			return false
-		} else {
-			return true
-		}
-	}
-	return false
+	return o.isOfType(property, "array")
 }
 
 func (o *SpecV2Resource) isSetTypeProperty(property spec.Schema) bool {
 	if o.isOfType(property, "array") {
-		if o.isBoolExtensionEnabled(property.Extensions, extTfIgnoreOrder) || o.isBoolExtensionEnabled(property.Extensions, extIgnoreOrder) {
+		if o.isBoolExtensionEnabled(property.Extensions, extTfSet) {
 			return true
-		} else {
-			return false
 		}
 	}
 	return false
