@@ -741,6 +741,7 @@ func (o *SpecV2Resource) isArrayTypeProperty(property spec.Schema) bool {
 func (o *SpecV2Resource) isSetTypeProperty(property spec.Schema) bool {
 	if o.isOfType(property, "array") {
 		if o.isBoolExtensionEnabled(property.Extensions, extTfSet) {
+			log.Printf("[INFO] ofTypeSetHaha")
 			return true
 		}
 	}
