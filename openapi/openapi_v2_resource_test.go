@@ -1744,6 +1744,26 @@ func TestGetResourcePath(t *testing.T) {
 			})
 		})
 	})
+
+	Convey("Given a SpecV2Resource with path resource that is parameterised (one level sub-resource)", t, func() {
+		r := SpecV2Resource{
+			Path: "/v1/cdns/{cdn_id}/v1/firewalls",
+		}
+		Convey("When getResourcePath is called with a list of IDs", func() {
+			ids := []string{"cdnID"}
+			resourcePath, err := r.getResourcePath(ids)
+			Convey("Then for the first time it should match expected one", func() {
+				So(err, ShouldBeNil)
+				So(resourcePath, ShouldEqual, "/v1/cdns/cdnID/v1/firewalls")
+			})
+			ids = []string{"cdnID2"}
+			resourcePath, err = r.getResourcePath(ids)
+			Convey("Then for the second time it should match expected one", func() {
+				So(err, ShouldBeNil)
+				So(resourcePath, ShouldEqual, "/v1/cdns/cdnID2/v1/firewalls")
+			})
+		})
+	})
 }
 
 func TestCreateSchemaDefinitionProperty(t *testing.T) {
