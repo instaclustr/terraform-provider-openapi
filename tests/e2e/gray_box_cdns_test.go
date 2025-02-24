@@ -126,6 +126,22 @@ paths:
   ######################
 
   /v1/cdns/{cdn_id}/v1/firewalls:
+    get:
+      summary: "Get all firewalls"
+      operationId: "ContentDeliveryNetworkGetV1"
+      parameters:
+      - name: "cdn_id"
+        in: "path"
+        description: "The cdn id that contains the firewall to be fetched."
+        required: true
+        type: "string"
+      responses:
+        200:
+          description: "successful operation"
+          schema:
+            type: array
+            items:
+              $ref: "#/definitions/ContentDeliveryNetworkFirewallRulesV1"
     post:
       summary: "Create cdn firewall"
       operationId: "ContentDeliveryNetworkFirewallCreateV1"
@@ -224,6 +240,17 @@ definitions:
         readOnly: true
       label:
         type: "string"
+  ContentDeliveryNetworkFirewallRulesV1:
+    type: "object"
+    properties:
+      cdn_id:
+        type: "string"
+        readOnly: true
+        x-terraform-id: true
+      firewall_rules:
+        type: array
+        items:
+          $ref: "#/definitions/ContentDeliveryNetworkFirewallV1"
   ContentDeliveryNetworkV1:
     type: "object"
     required:
@@ -260,11 +287,15 @@ type api struct {
 	// same behaviour expected form a real API
 	cachePayloads    map[string]interface{}
 	requestsReceived []*http.Request
+
+	// Custom assertion URI func. If it is nil, assertExpectedRequestURI is used.
+	assertExpectedRequestURI func(t *testing.T, expectedRequestURI string, r *http.Request)
 }
 
 func initAPI(t *testing.T, swaggerYAMLTemplate string) *api {
 	a := &api{
-		cachePayloads: map[string]interface{}{},
+		cachePayloads:            map[string]interface{}{},
+		assertExpectedRequestURI: assertExpectedRequestURI,
 	}
 	apiServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		a.handleRequest(t, w, r)
@@ -303,25 +334,25 @@ func (a *api) handleCDNRequest(t *testing.T) map[string]http.HandlerFunc {
 }`, expectedCDNID, expectedCDNLabel)
 
 	apiServerBehaviors[http.MethodPost] = func(w http.ResponseWriter, r *http.Request) {
-		assertExpectedRequestURI(t, "/v1/cdns", r)
+		a.assertExpectedRequestURI(t, "/v1/cdns", r)
 		a.apiPostResponse(t, expectedRequestInstanceURI, responseBody, w, r)
 	}
 	apiServerBehaviors[http.MethodGet] = func(w http.ResponseWriter, r *http.Request) {
 		if r.RequestURI == "/v1/cdns" {
 			expectedRequestInstanceURI = "/v1/cdns"
-			assertExpectedRequestURI(t, expectedRequestInstanceURI, r)
+			a.assertExpectedRequestURI(t, expectedRequestInstanceURI, r)
 			a.apiListResponse(t, w, r)
 		} else {
-			assertExpectedRequestURI(t, expectedRequestInstanceURI, r)
+			a.assertExpectedRequestURI(t, expectedRequestInstanceURI, r)
 			a.apiGetResponse(t, w, r)
 		}
 	}
 	apiServerBehaviors[http.MethodDelete] = func(w http.ResponseWriter, r *http.Request) {
-		assertExpectedRequestURI(t, expectedRequestInstanceURI, r)
+		a.assertExpectedRequestURI(t, expectedRequestInstanceURI, r)
 		a.apiDeleteResponse(t, w, r)
 	}
 	apiServerBehaviors[http.MethodPut] = func(w http.ResponseWriter, r *http.Request) {
-		assertExpectedRequestURI(t, expectedRequestInstanceURI, r)
+		a.assertExpectedRequestURI(t, expectedRequestInstanceURI, r)
 		a.apiPutResponse(t, w, r)
 	}
 	return apiServerBehaviors
@@ -332,19 +363,19 @@ func (a *api) handleCDNFirewallRequest(t *testing.T) map[string]http.HandlerFunc
 	expectedRequestInstanceURI := fmt.Sprintf("/v1/cdns/%s/v1/firewalls/%s", expectedCDNID, expectedCDNFirewallID)
 	responseBody := fmt.Sprintf(`{"id":%s,"label":"%s"}`, expectedCDNFirewallID, expectedCDNFirewallLabel)
 	apiServerBehaviors[http.MethodPost] = func(w http.ResponseWriter, r *http.Request) {
-		assertExpectedRequestURI(t, fmt.Sprintf("/v1/cdns/%s/v1/firewalls", expectedCDNID), r)
+		a.assertExpectedRequestURI(t, fmt.Sprintf("/v1/cdns/%s/v1/firewalls", expectedCDNID), r)
 		a.apiPostResponse(t, expectedRequestInstanceURI, responseBody, w, r)
 	}
 	apiServerBehaviors[http.MethodGet] = func(w http.ResponseWriter, r *http.Request) {
-		assertExpectedRequestURI(t, expectedRequestInstanceURI, r)
+		a.assertExpectedRequestURI(t, expectedRequestInstanceURI, r)
 		a.apiGetResponse(t, w, r)
 	}
 	apiServerBehaviors[http.MethodDelete] = func(w http.ResponseWriter, r *http.Request) {
-		assertExpectedRequestURI(t, expectedRequestInstanceURI, r)
+		a.assertExpectedRequestURI(t, expectedRequestInstanceURI, r)
 		a.apiDeleteResponse(t, w, r)
 	}
 	apiServerBehaviors[http.MethodPut] = func(w http.ResponseWriter, r *http.Request) {
-		assertExpectedRequestURI(t, expectedRequestInstanceURI, r)
+		a.assertExpectedRequestURI(t, expectedRequestInstanceURI, r)
 		a.apiPutResponse(t, w, r)
 	}
 	return apiServerBehaviors
@@ -1101,6 +1132,59 @@ func TestAccCDN_ImportSubResource(t *testing.T) {
 						openAPIResourceStateCDNFirewall, "cdn_v1_id", expectedCDNID),
 					resource.TestCheckResourceAttr(
 						openAPIResourceStateCDNFirewall, "label", expectedCDNFirewallLabel),
+				),
+			},
+		},
+	})
+}
+
+func TestAccCDN_DataSourceManyWithDifferentParents(t *testing.T) {
+	api := initAPI(t, cdnSwaggerYAMLTemplate)
+
+	api.cachePayloads["/v1/cdns/1/v1/firewalls"] = `[{"cdn_id": "1", "firewall_rules":[{"id":"123", "label":"importedFWLabel123"}]}]`
+	api.cachePayloads["/v1/cdns/2/v1/firewalls"] = `[{"cdn_id": "2", "firewall_rules":[{"id":"321", "label":"importedFWLabel321"}, {"id":"666", "label":"importedFWLabel666"}]}]`
+	api.assertExpectedRequestURI = func(t *testing.T, _ string, r *http.Request) {
+		if r.RequestURI != "/v1/cdns/1/v1/firewalls" && r.RequestURI != "/v1/cdns/2/v1/firewalls" {
+			t.Fatalf("Request URI mismatch. Got %s", r.RequestURI)
+		}
+	}
+
+	const tfFileContent = `
+data "openapi_cdn_v1_firewalls_v1" "fwrules1" {
+	cdn_v1_id = "1"
+}
+data "openapi_cdn_v1_firewalls_v1" "fwrules2" {
+	cdn_v1_id = "2"
+}
+`
+	const cdnFirewallRulesDatasource1 = "data.openapi_cdn_v1_firewalls_v1.fwrules1"
+	const cdnFirewallRulesDatasource2 = "data.openapi_cdn_v1_firewalls_v1.fwrules2"
+
+	p := openapi.ProviderOpenAPI{ProviderName: providerName}
+	provider, err := p.CreateSchemaProviderFromServiceConfiguration(&openapi.ServiceConfigStub{SwaggerURL: api.swaggerURL})
+	assert.NoError(t, err)
+	assertProviderSchema(t, provider)
+
+	resource.Test(t, resource.TestCase{
+		IsUnitTest:        true,
+		ProviderFactories: testAccProviders(provider),
+		PreCheck:          func() { testAccPreCheck(t, api.swaggerURL) },
+		Steps: []resource.TestStep{
+			{
+				Config: tfFileContent,
+				Check: resource.ComposeTestCheckFunc(
+					// data.openapi_cdn_v1_firewalls_v1.fwrules1
+					resource.TestCheckResourceAttr(cdnFirewallRulesDatasource1, "cdn_id", "1"),
+					resource.TestCheckResourceAttr(cdnFirewallRulesDatasource1, "firewall_rules.#", "1"),
+					resource.TestCheckResourceAttr(cdnFirewallRulesDatasource1, "firewall_rules.0.id", "123"),
+					resource.TestCheckResourceAttr(cdnFirewallRulesDatasource1, "firewall_rules.0.label", "importedFWLabel123"),
+					// data.openapi_cdn_v1_firewalls_v1.fwrules2
+					resource.TestCheckResourceAttr(cdnFirewallRulesDatasource2, "cdn_id", "2"),
+					resource.TestCheckResourceAttr(cdnFirewallRulesDatasource2, "firewall_rules.#", "2"),
+					resource.TestCheckResourceAttr(cdnFirewallRulesDatasource2, "firewall_rules.0.id", "321"),
+					resource.TestCheckResourceAttr(cdnFirewallRulesDatasource2, "firewall_rules.0.label", "importedFWLabel321"),
+					resource.TestCheckResourceAttr(cdnFirewallRulesDatasource2, "firewall_rules.1.id", "666"),
+					resource.TestCheckResourceAttr(cdnFirewallRulesDatasource2, "firewall_rules.2.label", "importedFWLabel666"),
 				),
 			},
 		},
