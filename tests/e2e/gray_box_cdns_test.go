@@ -1184,7 +1184,7 @@ data "openapi_cdn_v1_firewalls_v1" "fwrules2" {
 					resource.TestCheckResourceAttr(cdnFirewallRulesDatasource2, "firewall_rules.0.id", "321"),
 					resource.TestCheckResourceAttr(cdnFirewallRulesDatasource2, "firewall_rules.0.label", "importedFWLabel321"),
 					resource.TestCheckResourceAttr(cdnFirewallRulesDatasource2, "firewall_rules.1.id", "666"),
-					resource.TestCheckResourceAttr(cdnFirewallRulesDatasource2, "firewall_rules.2.label", "importedFWLabel666"),
+					resource.TestCheckResourceAttr(cdnFirewallRulesDatasource2, "firewall_rules.1.label", "importedFWLabel666"),
 				),
 			},
 		},
