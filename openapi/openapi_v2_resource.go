@@ -5,6 +5,7 @@ import (
 	"log"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/dikhan/terraform-provider-openapi/v3/openapi/openapiutils"
@@ -94,8 +95,15 @@ type SpecV2Resource struct {
 	specSchemaDefinitionCached *SpecSchemaDefinition
 	// parentResourceInfoCached is cached in GetParentResourceInfo() method
 	parentResourceInfoCached *ParentResourceInfo
-	// resolvedPathCached is cached in getResourcePath() method
-	resolvedPathCached string
+
+	// resolvedPathsCached contains cached resolved paths with populated parent ids in getResourcePath() method.
+	// Key is constructed by strings.Join(), the separator is underscore char _
+	// Value is resolved path.
+	// For instance, we have the following openapi path /v1/parent1/{parent1_id}/parent2/{parent2_id}/child
+	// If parentIDs = ["1", "1"] then the key is 1_1 and the value is /v1/parent1/1/parent2/1/child
+	// If parentIDs = ["2", "2"] then the key is 2_2 and the value is /v1/parent1/2/parent2/2/child
+	resolvedPathCached      map[string]string
+	resolvedPathsCachedLock sync.RWMutex
 }
 
 // newSpecV2Resource creates a SpecV2Resource with no region and default host
@@ -207,18 +215,30 @@ func (o *SpecV2Resource) buildResourceNameFromPath(resourcePath, preferredName s
 // resource path "/v1/cdns/{cdn_id}/v1/firewalls" and the []strin{"cdnID"} the returned path will be "/v1/cdns/cdnID/v1/firewalls".
 // If the resource path is not parameterised, then regular path will be returned accordingly
 func (o *SpecV2Resource) getResourcePath(parentIDs []string) (string, error) {
-	if o.resolvedPathCached != "" {
-		log.Printf("[DEBUG] getResourcePath hit the cache for '%s'", o.Name)
-		return o.resolvedPathCached, nil
+	if o.resolvedPathCached == nil {
+		o.resolvedPathCached = make(map[string]string)
 	}
-	resolvedPath := o.Path
+
+	key := strings.Join(parentIDs, "_")
+
+	o.resolvedPathsCachedLock.RLock()
+	resolvedPath, cached := o.resolvedPathCached[key]
+	o.resolvedPathsCachedLock.RUnlock()
+	if cached {
+		log.Printf("[DEBUG] getResourcePath hit the cache for '%s'", o.Name)
+		return resolvedPath, nil
+	}
+
+	resolvedPath = o.Path
 
 	pathParameterRegex, _ := regexp.Compile(pathParameterRegex)
 	pathParamsMatches := pathParameterRegex.FindAllStringSubmatch(resolvedPath, -1)
 
 	switch {
 	case len(pathParamsMatches) == 0:
-		o.resolvedPathCached = resolvedPath
+		o.resolvedPathsCachedLock.Lock()
+		o.resolvedPathCached[key] = resolvedPath
+		o.resolvedPathsCachedLock.Unlock()
 		log.Printf("[DEBUG] getResourcePath cache loaded for '%s'", o.Name)
 		return resolvedPath, nil
 
@@ -237,7 +257,10 @@ func (o *SpecV2Resource) getResourcePath(parentIDs []string) (string, error) {
 		resolvedPath = strings.Replace(resolvedPath, pathParamsMatches[idx][1], parentIDs[idx], 1)
 	}
 
-	o.resolvedPathCached = resolvedPath
+	o.resolvedPathsCachedLock.Lock()
+	o.resolvedPathCached[key] = resolvedPath
+	o.resolvedPathsCachedLock.Unlock()
+
 	log.Printf("[DEBUG] getResourcePath cache loaded for '%s'", o.Name)
 	return resolvedPath, nil
 }
@@ -547,8 +570,9 @@ func (o *SpecV2Resource) isOptionalComputedProperty(propertyName string, propert
 // by specifying the default attribute. Example:
 //
 // optional_computed_with_default:  # optional property that the default value is known at runtime, hence service provider documents it
-//  type: "string"
-//  default: “some known default value”
+//
+//	type: "string"
+//	default: “some known default value”
 func (o *SpecV2Resource) isOptionalComputedWithDefault(propertyName string, property spec.Schema) (bool, error) {
 	if !property.ReadOnly && property.Default != nil {
 		if o.isBoolExtensionEnabled(property.Extensions, extTfComputed) {
@@ -563,8 +587,9 @@ func (o *SpecV2Resource) isOptionalComputedWithDefault(propertyName string, prop
 // This covers the use case where a property is not marked as readOnly but still is optional value that can come from the user or if not provided will be computed by the API. Example
 //
 // optional_computed: # optional property that the default value is NOT known at runtime
-//  type: "string"
-//  x-terraform-computed: true
+//
+//	type: "string"
+//	x-terraform-computed: true
 func (o *SpecV2Resource) isOptionalComputed(propertyName string, property spec.Schema) (bool, error) {
 	if o.isBoolExtensionEnabled(property.Extensions, extTfComputed) {
 		if property.ReadOnly {

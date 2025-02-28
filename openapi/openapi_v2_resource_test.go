@@ -1656,8 +1656,9 @@ func TestGetResourcePath(t *testing.T) {
 			resourcePath, err := r.getResourcePath([]string{})
 			Convey("Then the returned resource path should match the expected one", func() {
 				So(err, ShouldBeNil)
+				So(r.resolvedPathCached, ShouldContainKey, "")
 				So(resourcePath, ShouldEqual, "/v1/cdns")
-				So(r.resolvedPathCached, ShouldEqual, "/v1/cdns")
+				So(r.resolvedPathCached[""], ShouldEqual, "/v1/cdns")
 			})
 		})
 		Convey("When getResourcePath is called with a nil list of IDs", func() {
@@ -1665,7 +1666,8 @@ func TestGetResourcePath(t *testing.T) {
 			Convey("Then the returned resource path should match the expected one", func() {
 				So(err, ShouldBeNil)
 				So(resourcePath, ShouldEqual, "/v1/cdns")
-				So(r.resolvedPathCached, ShouldEqual, "/v1/cdns")
+				So(r.resolvedPathCached, ShouldContainKey, "")
+				So(r.resolvedPathCached[""], ShouldEqual, "/v1/cdns")
 			})
 		})
 	})
@@ -1676,11 +1678,14 @@ func TestGetResourcePath(t *testing.T) {
 		}
 		Convey("When getResourcePath is called with a list of IDs", func() {
 			ids := []string{"parentID"}
+			expectedCacheKey := "parentID"
 			resourcePath, err := r.getResourcePath(ids)
 			Convey("Then the returned resource path should match the expected one", func() {
 				So(err, ShouldBeNil)
 				So(resourcePath, ShouldEqual, "/v1/cdns/parentID/v1/firewalls")
-				So(r.resolvedPathCached, ShouldEqual, "/v1/cdns/parentID/v1/firewalls")
+				So(r.resolvedPathCached, ShouldNotBeNil)
+				So(r.resolvedPathCached, ShouldContainKey, expectedCacheKey)
+				So(r.resolvedPathCached[expectedCacheKey], ShouldEqual, "/v1/cdns/parentID/v1/firewalls")
 			})
 		})
 		Convey("When getResourcePath is called with an empty list of IDs", func() {
@@ -1723,24 +1728,53 @@ func TestGetResourcePath(t *testing.T) {
 		}
 		Convey("When getResourcePath is called with a list of IDs", func() {
 			ids := []string{"cdnID", "fwID"}
+			expectedCacheKey := "cdnID_fwID"
 			resourcePath, err := r.getResourcePath(ids)
 			Convey("And the returned resource path should match the expected one", func() {
 				So(err, ShouldBeNil)
 				So(resourcePath, ShouldEqual, "/v1/cdns/cdnID/v1/firewalls/fwID/rules")
-				So(r.resolvedPathCached, ShouldEqual, "/v1/cdns/cdnID/v1/firewalls/fwID/rules")
+				So(r.resolvedPathCached, ShouldNotBeNil)
+				So(r.resolvedPathCached, ShouldContainKey, expectedCacheKey)
+				So(r.resolvedPathCached[expectedCacheKey], ShouldEqual, "/v1/cdns/cdnID/v1/firewalls/fwID/rules")
 			})
 		})
 	})
 
 	Convey("Given a SpecV2Resource with resolvedPathCached populated", t, func() {
 		r := SpecV2Resource{
-			resolvedPathCached: "/v1/cdns",
+			resolvedPathCached: map[string]string{
+				// Since len(nil) = 0, then strings.Join(nil, "_") will return ""
+				"": "/v1/cdns",
+			},
 		}
 		Convey("When getResourcePath is called with a nil list of IDs", func() {
 			resourcePath, err := r.getResourcePath(nil)
 			Convey("Then the returned resource path should match the expected one", func() {
 				So(err, ShouldBeNil)
 				So(resourcePath, ShouldEqual, "/v1/cdns")
+			})
+		})
+	})
+
+	Convey("Given a SpecV2Resource with path resource that is parameterised (one level sub-resource)", t, func() {
+		r := SpecV2Resource{
+			Path: "/v1/cdns/{cdn_id}/v1/firewalls",
+		}
+		Convey("When getResourcePath is called multiple times with different parent IDs", func() {
+			ids1 := []string{"cdnID1"}
+			expectedCacheKey1 := "cdnID1"
+			resourcePath1, err1 := r.getResourcePath(ids1)
+			ids2 := []string{"cdnID2"}
+			expectedCacheKey2 := "cdnID2"
+			resourcePath2, err2 := r.getResourcePath(ids2)
+			Convey("Then the cache should contain both resolved path and match the expected one", func() {
+				So(err1, ShouldBeNil)
+				So(err2, ShouldBeNil)
+				So(r.resolvedPathCached, ShouldHaveLength, 2)
+				So(r.resolvedPathCached, ShouldContainKey, expectedCacheKey1)
+				So(r.resolvedPathCached, ShouldContainKey, expectedCacheKey2)
+				So(resourcePath1, ShouldEqual, "/v1/cdns/cdnID1/v1/firewalls")
+				So(resourcePath2, ShouldEqual, "/v1/cdns/cdnID2/v1/firewalls")
 			})
 		})
 	})

@@ -82,7 +82,7 @@ func (specAnalyser *specV2Analyser) GetTerraformCompliantResources() ([]SpecReso
 			continue
 		}
 
-		err = specAnalyser.validateSubResourceTerraformCompliance(*r)
+		err = specAnalyser.validateSubResourceTerraformCompliance(r)
 		if err != nil {
 			log.Printf("[WARN] ignoring subresource name='%s' with rootPath='%s' due to not meeting validation requirements: %s", r.GetResourceName(), resourceRootPath, err)
 			continue
@@ -95,7 +95,7 @@ func (specAnalyser *specV2Analyser) GetTerraformCompliantResources() ([]SpecReso
 	return resources, nil
 }
 
-func (specAnalyser *specV2Analyser) validateSubResourceTerraformCompliance(r SpecV2Resource) error {
+func (specAnalyser *specV2Analyser) validateSubResourceTerraformCompliance(r *SpecV2Resource) error {
 	parentResourceInfo := r.GetParentResourceInfo()
 	if parentResourceInfo != nil {
 		resourcePath := r.Path
