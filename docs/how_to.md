@@ -1065,6 +1065,40 @@ and saving the state of the property.
 - Use case 3: If the remote value for the property `members` contained a shorter list than items in the tf input (eg: `{"members":["user3", "user1"}`) then state saved for the property would contain only the matching elements between the input and remote. That is: ``members = ["user1", "user3"]``
 - Use case 4: If the remote value for the property `members` contained the same list size as the items in the tf input but some elements inside where updated (eg: `{"members":["user1", "user5", "user9"]}`) then state saved for the property would contain the matching elements  between the input and output and also keep the remote values. That is: ``members = ["user1", "user5", "user9"]``
 
+###### <a name="lifecycleIgnoreChanges">Terraform lifecycle ignore_changes</a>
+
+Terraform's `lifecycle { ignore_changes = [...] }` meta-argument is supported for any attribute of a resource created from
+the OpenAPI document, including attributes inside nested objects and lists (for instance `ignore_changes = [settings[0].size]`)
+and `ignore_changes = all`. It lets users keep an attribute out of Terraform's management, typically because it is also
+changed outside of Terraform (for example in a console or by another tool), while the rest of the resource is still updated.
+
+Given the following terraform snippet where `node_size` is ignored:
+
+````
+resource "openapi_cdn_v1" "my_cdn" {
+  label     = "b"
+  node_size = "large"
+  lifecycle {
+    ignore_changes = [node_size]
+  }
+}
+````
+
+When the resource is updated (for instance, only `label` changes):
+
+- Terraform does not show differences for `node_size` in the plan.
+- The update request (PUT) sent to the API carries, for `node_size`, the value the API currently holds (read right before the update), never the value in the configuration. A change made to `node_size` outside of Terraform is therefore preserved, also when the apply runs with `-refresh=false`.
+- The same applies when the attribute is not set in the configuration at all, as long as it is not computed by the API.
+- Attributes marked `x-terraform-immutable` that are ignored do not abort the update, and are sent with the API value.
+- If the API does not return a value for an ignored attribute (for example write only or sensitive properties) the value stored in the Terraform state is sent instead.
+- If every difference is ignored, Terraform plans no changes and no update request is sent.
+
+Resources that do not use `ignore_changes` are not affected. Removing an attribute from `ignore_changes` makes Terraform manage it again,
+so the next plan shows the difference and the next apply sends the configured value.
+
+Limitation: for lists flagged with `x-terraform-ignore-order` that hold objects, ignored attributes of individual items are not
+detected when the list keeps the same number of items; only an ignored list of a different size (or the whole list) is.
+
 ##### <a name="propertyUseCasesSupport">Property use cases</a>
 
 Properties can be defined with different behaviours and constraints. As far as properties for definitions go, the following 

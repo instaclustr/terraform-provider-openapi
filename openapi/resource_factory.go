@@ -224,9 +224,28 @@ func (r resourceFactory) update(data *schema.ResourceData, i interface{}) error 
 		return fmt.Errorf("[resource='%s'] resource does not support PUT operation, check the swagger file exposed on '%s'", r.openAPIResource.GetResourceName(), resourcePath)
 	}
 
+	// The remote object is read once and shared by the immutable fields check (and, for ignored attributes, the payload)
+	remoteData, err := r.readRemote(data.Id(), providerClient, parentsIDs...)
+	if err != nil {
+		return err
+	}
+
 	requestPayload := r.createPayloadFromTerraformConfig(data)
 
-	if err := r.checkImmutableFields(data, providerClient, parentsIDs...); err != nil {
+	// Attributes in lifecycle { ignore_changes } are hidden from the plan by Terraform core (it keeps the prior value in
+	// the plan) but the payload above is built from the raw configuration. They must not be changed by this update, so
+	// they are sent with the value the API currently holds (INS-45117).
+	resourceSchema, err := r.openAPIResource.GetResourceSchema()
+	if err != nil {
+		return err
+	}
+	ignored := findIgnoredAttributePaths(data.GetRawConfig(), data.GetRawPlan(), resourceSchema)
+	if len(ignored) > 0 {
+		log.Printf("[DEBUG] [resource='%s'] sending the current API value for the attribute(s) ignored by lifecycle ignore_changes: %v", resourceName, ignoredAttributeNames(ignored))
+		overlayRemoteValues(requestPayload, remoteData, resourceSchema, ignored)
+	}
+
+	if err := r.checkImmutableFieldsWithRemote(data, remoteData, ignored); err != nil {
 		return err
 	}
 
@@ -432,9 +451,24 @@ func (r resourceFactory) checkImmutableFields(updatedResourceLocalData *schema.R
 	if err != nil {
 		return err
 	}
+	return r.checkImmutableFieldsWithRemote(updatedResourceLocalData, remoteData, nil)
+}
+
+// checkImmutableFieldsWithRemote validates immutable properties against an already retrieved remote object. Attributes
+// listed in ignored (lifecycle ignore_changes) are skipped since the update will not change them.
+func (r resourceFactory) checkImmutableFieldsWithRemote(updatedResourceLocalData *schema.ResourceData, remoteData map[string]interface{}, ignored []ignoredAttribute) error {
+	ignoredTopLevel := map[string]bool{}
+	for _, attribute := range ignored {
+		if len(attribute.Path) > 0 {
+			ignoredTopLevel[attribute.Path[0]] = true
+		}
+	}
 	localData := r.createPayloadFromLocalStateData(updatedResourceLocalData)
 	s, _ := r.openAPIResource.GetResourceSchema()
 	for _, p := range s.Properties {
+		if ignoredTopLevel[p.GetTerraformCompliantPropertyName()] {
+			continue
+		}
 		err := r.validateImmutableProperty(p, remoteData[p.Name], localData[p.Name], false)
 		if err != nil {
 			// Rolling back data so tf values are not stored in the state file; otherwise terraform would store the

@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"github.com/dikhan/terraform-provider-openapi/v3/openapi/openapierr"
 	"github.com/go-openapi/spec"
+	"github.com/hashicorp/go-cty/cty"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/terraform"
 	"github.com/stretchr/testify/assert"
 	"io/ioutil"
 	"log"
@@ -2646,4 +2648,202 @@ func testCreateSubResourceFactory(t *testing.T, path string, parentResourceNames
 	specResource.parentResourceNames = parentResourceNames
 	specResource.fullParentResourceName = fullParentResourceName
 	return newResourceFactory(specResource), resourceData
+}
+
+// TestUpdateIgnoredAttributes covers INS-45117: attributes in lifecycle ignore_changes must be sent with the value the
+// API currently holds, never the value in the configuration, while the other attributes are updated normally.
+func TestUpdateIgnoredAttributes(t *testing.T) {
+	readOnlyIDProperty := newStringSchemaDefinitionProperty("id", "", false, true, false, false, false, false, true, false, "id")
+	optionalProperty := newStringSchemaDefinitionPropertyWithDefaults("optional_property", "", false, false, nil)
+	r, _ := testCreateResourceFactoryWithID(t, readOnlyIDProperty, ignoreStringProperty, ignoreIntProperty, optionalProperty)
+	prior := map[string]string{"id": "id", "string_property": "priorValue", "int_property": "10"}
+
+	newClient := func(remote map[string]interface{}) *clientOpenAPIStub {
+		remote["id"] = "id"
+		return &clientOpenAPIStub{responsePayload: remote}
+	}
+	putPayload := func(t *testing.T, c *clientOpenAPIStub) map[string]interface{} {
+		payload, ok := c.putPayloadReceived.(map[string]interface{})
+		if !assert.True(t, ok, "expected the PUT payload to be a map but got %v", c.putPayloadReceived) {
+			t.FailNow()
+		}
+		return payload
+	}
+
+	t.Run("ignored attribute is sent with the API value and the changed attribute with the new value (also required attributes)", func(t *testing.T) {
+		client := newClient(map[string]interface{}{"string_property": "priorValue", "int_property": float64(10)})
+		config := map[string]interface{}{"string_property": "newValueFromHCL", "int_property": 11}
+		plan := map[string]interface{}{"string_property": "priorValue", "int_property": 11}
+		assert.NoError(t, applyUpdateWithRaw(t, r, "id", prior, config, plan, client))
+		payload := putPayload(t, client)
+		assert.Equal(t, "priorValue", payload["string_property"])
+		assert.Equal(t, 11, payload["int_property"])
+		assert.Equal(t, 1, client.getCalls, "the remote object must be read exactly once, before the PUT")
+		assert.Equal(t, 1, client.putCalls)
+	})
+	t.Run("console change is preserved even when the state is stale, as with -refresh=false (FR-010)", func(t *testing.T) {
+		// state and plan still hold priorValue but the API now holds consoleValue
+		client := newClient(map[string]interface{}{"string_property": "consoleValue", "int_property": float64(10)})
+		config := map[string]interface{}{"string_property": "newValueFromHCL", "int_property": 11}
+		plan := map[string]interface{}{"string_property": "priorValue", "int_property": 11}
+		assert.NoError(t, applyUpdateWithRaw(t, r, "id", prior, config, plan, client))
+		assert.Equal(t, "consoleValue", putPayload(t, client)["string_property"])
+	})
+	t.Run("ignored attribute omitted from the configuration is sent with the API value, not an empty value (FR-011)", func(t *testing.T) {
+		client := newClient(map[string]interface{}{"string_property": "priorValue", "int_property": float64(10), "optional_property": "consoleValue"})
+		config := map[string]interface{}{"string_property": "priorValue", "int_property": 11}
+		plan := map[string]interface{}{"string_property": "priorValue", "int_property": 11, "optional_property": "priorOptional"}
+		assert.NoError(t, applyUpdateWithRaw(t, r, "id", map[string]string{"id": "id", "string_property": "priorValue", "int_property": "10", "optional_property": "priorOptional"}, config, plan, client))
+		assert.Equal(t, "consoleValue", putPayload(t, client)["optional_property"])
+	})
+}
+
+// TestUpdateIgnoredAttributesNestedComputedRegression: a computed attribute inside the items of a list, which the config
+// leaves null while the plan carries the computed value, is NOT an ignored attribute (the case fixed by commit
+// 7471de73). The payload must be identical to the one built when the plan equals the config.
+func TestUpdateIgnoredAttributesNestedComputedRegression(t *testing.T) {
+	readOnlyIDProperty := newStringSchemaDefinitionProperty("id", "", false, true, false, false, false, false, true, false, "id")
+	r, _ := testCreateResourceFactoryWithID(t, readOnlyIDProperty, ignoreStringProperty, ignoreListOfObjectsProperty)
+	prior := map[string]string{"id": "id", "string_property": "a", "items.#": "1", "items.0.field": "a", "items.0.computed_field": "computedByAPI"}
+	ty := testImpliedType(t, readOnlyIDProperty, ignoreStringProperty, ignoreListOfObjectsProperty)
+	itemType := ty.AttributeType("items").ElementType()
+	config := testObjectValue(ty, map[string]cty.Value{
+		"string_property": cty.StringVal("a"),
+		"items":           cty.ListVal([]cty.Value{testObjectValue(itemType, map[string]cty.Value{"field": cty.StringVal("a")})}),
+	})
+	planWithComputed := testObjectValue(ty, map[string]cty.Value{
+		"string_property": cty.StringVal("a"),
+		"items":           cty.ListVal([]cty.Value{testObjectValue(itemType, map[string]cty.Value{"field": cty.StringVal("a"), "computed_field": cty.StringVal("computedByAPI")})}),
+	})
+	remote := func() map[string]interface{} {
+		return map[string]interface{}{"id": "id", "string_property": "a", "items": []interface{}{map[string]interface{}{"field": "a", "computed_field": "computedByAPI"}}}
+	}
+	payloadFor := func(t *testing.T, plan cty.Value) interface{} {
+		client := &clientOpenAPIStub{responsePayload: remote()}
+		res, err := r.createTerraformResource()
+		assert.NoError(t, err)
+		data := res.Data(&terraform.InstanceState{ID: "id", Attributes: prior, RawConfig: config, RawPlan: plan})
+		assert.NoError(t, r.update(data, client))
+		return client.putPayloadReceived
+	}
+
+	withComputed := payloadFor(t, planWithComputed)
+	withoutComputed := payloadFor(t, config)
+	assert.Equal(t, withoutComputed, withComputed, "the computed attribute must not be treated as ignored")
+}
+
+// TestUpdateWithoutIgnoredAttributesKeepsPayload (FR-007): when the plan equals the configuration for every property, which
+// is always the case when ignore_changes is not used, the payload sent is exactly what the config based payload builder
+// produces, i.e. what the provider sent before INS-45117
+func TestUpdateWithoutIgnoredAttributesKeepsPayload(t *testing.T) {
+	readOnlyIDProperty := newStringSchemaDefinitionProperty("id", "", false, true, false, false, false, false, true, false, "id")
+	str := cty.StringVal
+	flatProperties := []*SpecSchemaDefinitionProperty{readOnlyIDProperty, ignoreStringProperty, ignoreIntProperty, ignoreOptionalProperty, ignoreListOfObjectsProperty, ignoreListOfStringsProperty}
+	objectProperties := []*SpecSchemaDefinitionProperty{readOnlyIDProperty, ignoreStringProperty, ignoreIntProperty, ignoreObjectProperty}
+	flatType := testImpliedType(t, flatProperties...)
+	objectType := testImpliedType(t, objectProperties...)
+	itemType := flatType.AttributeType("items").ElementType()
+	settingsType := objectType.AttributeType("settings").ElementType()
+
+	fixtures := []struct {
+		name       string
+		properties []*SpecSchemaDefinitionProperty
+		attributes map[string]string // the prior state, the immutable fields check reads it
+		config     cty.Value
+	}{
+		{"only required properties", flatProperties, map[string]string{"id": "id"},
+			testObjectValue(flatType, map[string]cty.Value{"string_property": str("a"), "int_property": cty.NumberIntVal(1)})},
+		{"optional property set", flatProperties, map[string]string{"id": "id"},
+			testObjectValue(flatType, map[string]cty.Value{"string_property": str("a"), "int_property": cty.NumberIntVal(1), "optional_property": str("o")})},
+		{"nested object", objectProperties, map[string]string{"id": "id", "settings.#": "1", "settings.0.field": "f", "settings.0.other": "o"},
+			testObjectValue(objectType, map[string]cty.Value{"string_property": str("a"), "int_property": cty.NumberIntVal(1),
+				"settings": cty.ListVal([]cty.Value{testObjectValue(settingsType, map[string]cty.Value{"field": str("f"), "other": str("o")})})})},
+		{"lists", flatProperties, map[string]string{"id": "id"},
+			testObjectValue(flatType, map[string]cty.Value{"string_property": str("a"), "int_property": cty.NumberIntVal(1),
+				"items": cty.ListVal([]cty.Value{testObjectValue(itemType, map[string]cty.Value{"field": str("f")}), testObjectValue(itemType, map[string]cty.Value{"field": str("g")})}),
+				"tags":  cty.ListVal([]cty.Value{str("x"), str("y")})})},
+	}
+	for _, fixture := range fixtures {
+		fixture := fixture
+		t.Run(fixture.name, func(t *testing.T) {
+			r, _ := testCreateResourceFactoryWithID(t, readOnlyIDProperty, fixture.properties[1:]...)
+			res, err := r.createTerraformResource()
+			assert.NoError(t, err)
+			data := res.Data(&terraform.InstanceState{ID: "id", Attributes: fixture.attributes, RawConfig: fixture.config, RawPlan: fixture.config})
+			expected := r.createPayloadFromTerraformConfig(data) // the builder used before INS-45117
+			client := &clientOpenAPIStub{responsePayload: map[string]interface{}{"id": "id"}}
+			assert.NoError(t, r.update(data, client))
+			assert.Equal(t, expected, client.putPayloadReceived)
+			assert.Equal(t, 1, client.putCalls)
+		})
+	}
+}
+
+// TestUpdateIgnoredImmutableAttribute: an immutable attribute that is ignored does not abort the update and is sent with the
+// API value (even when the state is stale), while a non ignored immutable attribute still aborts it
+func TestUpdateIgnoredImmutableAttribute(t *testing.T) {
+	readOnlyIDProperty := newStringSchemaDefinitionProperty("id", "", false, true, false, false, false, false, true, false, "id")
+	r, _ := testCreateResourceFactoryWithID(t, readOnlyIDProperty, immutableProperty, ignoreIntProperty)
+	immutableName := immutableProperty.Name
+
+	t.Run("ignored immutable attribute whose config differs from the API: no abort, the API value is sent", func(t *testing.T) {
+		client := &clientOpenAPIStub{responsePayload: map[string]interface{}{"id": "id", immutableName: "priorValue", "int_property": float64(10)}}
+		attributes := map[string]string{"id": "id", immutableName: "priorValue", "int_property": "10"}
+		config := map[string]interface{}{immutableName: "newValueFromHCL", "int_property": 11}
+		plan := map[string]interface{}{immutableName: "priorValue", "int_property": 11}
+		assert.NoError(t, applyUpdateWithRaw(t, r, "id", attributes, config, plan, client))
+		payload := client.putPayloadReceived.(map[string]interface{})
+		assert.Equal(t, "priorValue", payload[immutableName])
+		assert.Equal(t, 11, payload["int_property"])
+	})
+	t.Run("ignored immutable attribute with a stale state (-refresh=false): no abort, the current API value is sent", func(t *testing.T) {
+		client := &clientOpenAPIStub{responsePayload: map[string]interface{}{"id": "id", immutableName: "consoleValue", "int_property": float64(10)}}
+		attributes := map[string]string{"id": "id", immutableName: "priorValue", "int_property": "10"}
+		config := map[string]interface{}{immutableName: "newValueFromHCL", "int_property": 11}
+		plan := map[string]interface{}{immutableName: "priorValue", "int_property": 11}
+		assert.NoError(t, applyUpdateWithRaw(t, r, "id", attributes, config, plan, client))
+		assert.Equal(t, "consoleValue", client.putPayloadReceived.(map[string]interface{})[immutableName])
+	})
+	t.Run("a non ignored immutable attribute that changes still aborts the update before the PUT", func(t *testing.T) {
+		client := &clientOpenAPIStub{responsePayload: map[string]interface{}{"id": "id", immutableName: "oldValue", "int_property": float64(10)}}
+		attributes := map[string]string{"id": "id", immutableName: "newValueFromHCL", "int_property": "11"}
+		config := map[string]interface{}{immutableName: "newValueFromHCL", "int_property": 11}
+		err := applyUpdateWithRaw(t, r, "id", attributes, config, config, client)
+		if assert.Error(t, err) {
+			assert.Contains(t, err.Error(), "validation for immutable properties failed")
+			assert.Contains(t, err.Error(), immutableName)
+		}
+		assert.Equal(t, 0, client.putCalls, "no PUT must be sent when an immutable attribute changes")
+	})
+}
+
+// TestUpdateErrorsUnrelatedToIgnoredAttributesAreSurfaced (FR-009): errors from the API are returned as they are, also when
+// the update contains ignored attributes
+func TestUpdateErrorsUnrelatedToIgnoredAttributesAreSurfaced(t *testing.T) {
+	readOnlyIDProperty := newStringSchemaDefinitionProperty("id", "", false, true, false, false, false, false, true, false, "id")
+	r, _ := testCreateResourceFactoryWithID(t, readOnlyIDProperty, ignoreStringProperty, ignoreIntProperty)
+	attributes := map[string]string{"id": "id", "string_property": "priorValue", "int_property": "10"}
+	config := map[string]interface{}{"string_property": "newValueFromHCL", "int_property": 11}
+	plan := map[string]interface{}{"string_property": "priorValue", "int_property": 11}
+	remote := func() map[string]interface{} {
+		return map[string]interface{}{"id": "id", "string_property": "priorValue", "int_property": float64(10)}
+	}
+
+	t.Run("the error returned by the client is returned unchanged", func(t *testing.T) {
+		client := &clientOpenAPIStub{responsePayload: remote(), funcPut: func() (*http.Response, error) {
+			return nil, errors.New("connection reset by peer")
+		}}
+		err := applyUpdateWithRaw(t, r, "id", attributes, config, plan, client)
+		assert.EqualError(t, err, "connection reset by peer")
+	})
+	t.Run("a rejection from the API keeps the status code and the API message", func(t *testing.T) {
+		client := &clientOpenAPIStub{responsePayload: remote(), funcPut: func() (*http.Response, error) {
+			return &http.Response{StatusCode: http.StatusBadRequest, Body: ioutil.NopCloser(strings.NewReader("node count must be a multiple of 3"))}, nil
+		}}
+		err := applyUpdateWithRaw(t, r, "id", attributes, config, plan, client)
+		if assert.Error(t, err) {
+			assert.Contains(t, err.Error(), "400")
+			assert.Contains(t, err.Error(), "node count must be a multiple of 3")
+		}
+	})
 }

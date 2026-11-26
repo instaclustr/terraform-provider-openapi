@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"reflect"
 	"strconv"
+	"strings"
 
 	"github.com/dikhan/terraform-provider-openapi/v3/openapi/openapierr"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
@@ -360,6 +361,247 @@ func setStateID(openAPIres SpecResource, resourceLocalData *schema.ResourceData,
 		resourceLocalData.SetId(payload[identifierProperty].(string))
 	}
 	return nil
+}
+
+// ignoredAttribute describes an attribute that Terraform core is ignoring through lifecycle { ignore_changes = [...] }.
+// Core implements ignore_changes by keeping the prior state value in the plan while the raw configuration still holds
+// the HCL value, so the provider must not send the configured value for these attributes (INS-45117).
+// Path holds Terraform attribute names from the resource root; list indexes are decimal strings (e.g. ["rules", "0", "port"]).
+// PlanValue is the planned (prior state) value converted like the rest of the config object; it is only used as a
+// fallback when the API does not return a value for the attribute.
+type ignoredAttribute struct {
+	Path      []string
+	PlanValue interface{}
+}
+
+// findIgnoredAttributePaths compares the raw configuration with the raw plan and returns the attributes that are being
+// ignored. An attribute is ignored when the plan value is known and non-null and differs from the configuration value,
+// and either the configuration value is known and non-null, or it is null and the attribute is not computed (a null
+// configuration with a non-null plan can only come from ignore_changes for a non-computed attribute). Values are
+// compared as cty.Value (IsNull, IsKnown, RawEquals) before any conversion so null and unknown are never confused with
+// zero values. Resources that do not use ignore_changes yield an empty result.
+//
+// Nested values:
+//   - objects (terraform lists with one item) and lists of objects with the same length are inspected per item, so an
+//     ignored attribute of an item does not hide the changes of its siblings;
+//   - a list whose length differs between configuration and plan, or a list of primitives that differs, is ignored as a
+//     whole, because lengths can only differ when the plan kept the prior value;
+//   - lists flagged to ignore the items order are compared as a multiset when they hold primitives and are not inspected
+//     per item when they hold objects (the plan may legitimately reorder them), only a length difference ignores them.
+func findIgnoredAttributePaths(config, plan cty.Value, resourceSchema *SpecSchemaDefinition) []ignoredAttribute {
+	if resourceSchema == nil || !isKnownObject(config) || !isKnownObject(plan) {
+		return nil
+	}
+	return findIgnoredInObject(nil, config, plan, resourceSchema)
+}
+
+func findIgnoredInObject(path []string, config, plan cty.Value, resourceSchema *SpecSchemaDefinition) []ignoredAttribute {
+	var ignored []ignoredAttribute
+	if resourceSchema == nil {
+		return ignored
+	}
+	for _, property := range resourceSchema.Properties {
+		if property.isReadOnly() || property.IsParentProperty {
+			continue
+		}
+		name := property.GetTerraformCompliantPropertyName()
+		if !config.Type().HasAttribute(name) || !plan.Type().HasAttribute(name) {
+			continue
+		}
+		ignored = append(ignored, findIgnoredInProperty(appendPath(path, name), property, config.GetAttr(name), plan.GetAttr(name))...)
+	}
+	return ignored
+}
+
+func findIgnoredInProperty(path []string, property *SpecSchemaDefinitionProperty, configValue, planValue cty.Value) []ignoredAttribute {
+	if !planValue.IsKnown() || planValue.IsNull() || !configValue.IsKnown() {
+		return nil
+	}
+	switch {
+	case isPrimitivePropertyType(property):
+		if configValue.IsNull() {
+			if property.isComputed() {
+				return nil
+			}
+		} else if configValue.RawEquals(planValue) {
+			return nil
+		}
+		return []ignoredAttribute{{Path: path, PlanValue: getTerraformConfigObject(planValue)}}
+	case property.shouldUseLegacyTerraformSDKBlockApproachForComplexObjects():
+		return findIgnoredInObjectBlock(path, property, configValue, planValue)
+	case property.isArrayProperty():
+		return findIgnoredInList(path, property, configValue, planValue)
+	}
+	return nil
+}
+
+// findIgnoredInObjectBlock handles nested objects, which terraform represents as a list with at most one item
+func findIgnoredInObjectBlock(path []string, property *SpecSchemaDefinitionProperty, configValue, planValue cty.Value) []ignoredAttribute {
+	configItems, planItems := listItems(configValue), listItems(planValue)
+	if len(planItems) == 0 {
+		return nil
+	}
+	if len(configItems) == 0 {
+		if property.isComputed() {
+			return nil
+		}
+		return []ignoredAttribute{{Path: path}} // the whole object was left out of the configuration but the plan kept it
+	}
+	if len(configItems) == 1 && len(planItems) == 1 && isKnownObject(configItems[0]) && isKnownObject(planItems[0]) {
+		return findIgnoredInObject(appendPath(path, "0"), configItems[0], planItems[0], property.SpecSchemaDefinition)
+	}
+	return nil
+}
+
+func findIgnoredInList(path []string, property *SpecSchemaDefinitionProperty, configValue, planValue cty.Value) []ignoredAttribute {
+	configItems, planItems := listItems(configValue), listItems(planValue)
+	if len(configItems) == 0 && len(planItems) > 0 && property.isComputed() {
+		return nil
+	}
+	isListOfPrimitives, _ := property.isTerraformListOfSimpleValues()
+	if isListOfPrimitives {
+		if configValue.RawEquals(planValue) {
+			return nil
+		}
+		if property.shouldIgnoreOrder() && sameItemsIgnoringOrder(configItems, planItems) {
+			return nil
+		}
+		return []ignoredAttribute{{Path: path, PlanValue: getTerraformConfigObject(planValue)}}
+	}
+	if len(configItems) != len(planItems) {
+		return []ignoredAttribute{{Path: path}}
+	}
+	if property.shouldIgnoreOrder() {
+		return nil
+	}
+	var ignored []ignoredAttribute
+	for index := range configItems {
+		if isKnownObject(configItems[index]) && isKnownObject(planItems[index]) {
+			ignored = append(ignored, findIgnoredInObject(appendPath(path, strconv.Itoa(index)), configItems[index], planItems[index], property.SpecSchemaDefinition)...)
+		}
+	}
+	return ignored
+}
+
+// listItems returns the items of a known terraform list, or nothing for null values and other types
+func listItems(value cty.Value) []cty.Value {
+	if !value.IsKnown() || value.IsNull() || !value.Type().IsListType() {
+		return nil
+	}
+	return value.AsValueSlice()
+}
+
+// sameItemsIgnoringOrder returns true when both slices hold the same values, whatever their order
+func sameItemsIgnoringOrder(a, b []cty.Value) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	matched := make([]bool, len(b))
+	for _, itemA := range a {
+		found := false
+		for index, itemB := range b {
+			if !matched[index] && itemA.RawEquals(itemB) {
+				matched[index] = true
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+	return true
+}
+
+// appendPath returns a new path, never sharing the backing array of the given one
+func appendPath(path []string, segment string) []string {
+	return append(append([]string{}, path...), segment)
+}
+
+// ignoredAttributeNames returns the Terraform attribute paths (names only, never values) for logging purposes
+func ignoredAttributeNames(ignored []ignoredAttribute) []string {
+	names := []string{}
+	for _, attribute := range ignored {
+		names = append(names, strings.Join(attribute.Path, "."))
+	}
+	return names
+}
+
+// isPrimitivePropertyType returns true for string, integer, number and boolean properties
+func isPrimitivePropertyType(property *SpecSchemaDefinitionProperty) bool {
+	switch property.Type {
+	case TypeString, TypeInt, TypeFloat, TypeBool:
+		return true
+	}
+	return false
+}
+
+// isKnownObject returns true for a known, non-null cty object (what the raw config and the raw plan are during updates)
+func isKnownObject(value cty.Value) bool {
+	return value != cty.NilVal && value.IsKnown() && !value.IsNull() && value.Type().IsObjectType()
+}
+
+// overlayRemoteValues replaces, in the payload that is about to be sent to the API, the value of every ignored attribute
+// with the value the API currently holds (remote, in API property names). The Terraform attribute names in each path are
+// translated to API property names through the resource schema. When the remote object has no value for an attribute
+// the ignoredAttribute.PlanValue is used instead. With no ignored attributes the payload is left untouched.
+func overlayRemoteValues(payload map[string]interface{}, remote map[string]interface{}, resourceSchema *SpecSchemaDefinition, ignored []ignoredAttribute) {
+	for _, attribute := range ignored {
+		overlayRemoteValue(payload, remote, resourceSchema, attribute.Path, attribute.PlanValue)
+	}
+}
+
+func overlayRemoteValue(payload map[string]interface{}, remote map[string]interface{}, resourceSchema *SpecSchemaDefinition, path []string, planValue interface{}) {
+	if len(path) == 0 || resourceSchema == nil || payload == nil {
+		return
+	}
+	property, err := resourceSchema.getPropertyBasedOnTerraformName(path[0])
+	if err != nil {
+		log.Printf("[WARN] ignored attribute '%s' not found in the resource schema, it will not be overlaid: %s", path[0], err)
+		return
+	}
+	rest := path[1:]
+	if len(rest) == 0 {
+		if remoteValue, ok := remote[property.Name]; ok && remoteValue != nil {
+			payload[property.Name] = remoteValue
+		} else if planValue != nil {
+			payload[property.Name] = planValue
+		}
+		return
+	}
+	if property.SpecSchemaDefinition == nil {
+		return
+	}
+	if property.shouldUseLegacyTerraformSDKBlockApproachForComplexObjects() {
+		// terraform represents a nested object as a list with one item while the payload holds the object itself
+		if _, err := strconv.Atoi(rest[0]); err == nil {
+			rest = rest[1:]
+		}
+		nestedPayload, ok := payload[property.Name].(map[string]interface{})
+		if !ok {
+			return
+		}
+		nestedRemote, _ := remote[property.Name].(map[string]interface{})
+		overlayRemoteValue(nestedPayload, nestedRemote, property.SpecSchemaDefinition, rest, planValue)
+		return
+	}
+	index, err := strconv.Atoi(rest[0])
+	if err != nil {
+		return
+	}
+	payloadList, ok := payload[property.Name].([]interface{})
+	if !ok || index < 0 || index >= len(payloadList) {
+		return
+	}
+	nestedPayload, ok := payloadList[index].(map[string]interface{})
+	if !ok {
+		return
+	}
+	var nestedRemote map[string]interface{}
+	if remoteList, ok := remote[property.Name].([]interface{}); ok && index < len(remoteList) {
+		nestedRemote, _ = remoteList[index].(map[string]interface{})
+	}
+	overlayRemoteValue(nestedPayload, nestedRemote, property.SpecSchemaDefinition, rest[1:], planValue)
 }
 
 // Gets the HCL code equivalent map object of the resource without caring about the state file.

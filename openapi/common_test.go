@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/go-openapi/spec"
+	"github.com/hashicorp/go-cty/cty"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	. "github.com/smartystreets/goconvey/convey"
 	"github.com/stretchr/testify/assert"
@@ -1394,4 +1395,309 @@ func TestProcessIgnoreOrderIfEnabled(t *testing.T) {
 		output := processIgnoreOrderIfEnabled(tc.property, tc.inputPropertyValue, tc.remoteValue)
 		assert.Equal(t, tc.expectedOutput, output, tc.name)
 	}
+}
+
+// properties used by the ignore_changes (INS-45117) tests
+var ignoreStringProperty = newStringSchemaDefinitionPropertyWithDefaults("string_property", "", true, false, nil)
+var ignoreIntProperty = newIntSchemaDefinitionPropertyWithDefaults("int_property", "", true, false, nil)
+var ignoreOptionalProperty = newStringSchemaDefinitionPropertyWithDefaults("optional_property", "", false, false, nil)
+var ignoreOptionalComputedProperty = newStringSchemaDefinitionProperty("optional_computed_property", "", false, false, true, false, false, false, false, false, nil)
+
+func TestFindIgnoredAttributePaths(t *testing.T) {
+	properties := []*SpecSchemaDefinitionProperty{ignoreStringProperty, ignoreIntProperty, ignoreOptionalProperty, ignoreOptionalComputedProperty}
+	ty := testImpliedType(t, properties...)
+	resourceSchema := newTestSchema(properties...).getSchemaDefinition()
+	str := func(s string) cty.Value { return cty.StringVal(s) }
+
+	testCases := []struct {
+		name     string
+		config   cty.Value
+		plan     cty.Value
+		expected []ignoredAttribute
+	}{
+		{
+			name:     "top level primitive ignored: plan kept the prior value while the config has a new one",
+			config:   testObjectValue(ty, map[string]cty.Value{"string_property": str("new"), "int_property": cty.NumberIntVal(1)}),
+			plan:     testObjectValue(ty, map[string]cty.Value{"string_property": str("prior"), "int_property": cty.NumberIntVal(1)}),
+			expected: []ignoredAttribute{{Path: []string{"string_property"}, PlanValue: "prior"}},
+		},
+		{
+			name:     "sibling changed is not ignored, only the attribute where plan differs from config",
+			config:   testObjectValue(ty, map[string]cty.Value{"string_property": str("new"), "int_property": cty.NumberIntVal(2)}),
+			plan:     testObjectValue(ty, map[string]cty.Value{"string_property": str("prior"), "int_property": cty.NumberIntVal(2)}),
+			expected: []ignoredAttribute{{Path: []string{"string_property"}, PlanValue: "prior"}},
+		},
+		{
+			name:     "no differences between config and plan",
+			config:   testObjectValue(ty, map[string]cty.Value{"string_property": str("same"), "int_property": cty.NumberIntVal(1)}),
+			plan:     testObjectValue(ty, map[string]cty.Value{"string_property": str("same"), "int_property": cty.NumberIntVal(1)}),
+			expected: nil,
+		},
+		{
+			name:     "numbers written as integer and float with the same value are equal",
+			config:   testObjectValue(ty, map[string]cty.Value{"string_property": str("a"), "int_property": cty.NumberIntVal(10)}),
+			plan:     testObjectValue(ty, map[string]cty.Value{"string_property": str("a"), "int_property": cty.NumberFloatVal(10)}),
+			expected: nil,
+		},
+		{
+			name:     "null config, plan set and attribute not computed: ignored attribute omitted from the HCL (FR-011)",
+			config:   testObjectValue(ty, map[string]cty.Value{"string_property": str("a"), "int_property": cty.NumberIntVal(1)}),
+			plan:     testObjectValue(ty, map[string]cty.Value{"string_property": str("a"), "int_property": cty.NumberIntVal(1), "optional_property": str("prior")}),
+			expected: []ignoredAttribute{{Path: []string{"optional_property"}, PlanValue: "prior"}},
+		},
+		{
+			name:     "null config, plan set and attribute optional computed: normal computed behaviour, not ignored",
+			config:   testObjectValue(ty, map[string]cty.Value{"string_property": str("a"), "int_property": cty.NumberIntVal(1)}),
+			plan:     testObjectValue(ty, map[string]cty.Value{"string_property": str("a"), "int_property": cty.NumberIntVal(1), "optional_computed_property": str("computedByAPI")}),
+			expected: nil,
+		},
+		{
+			name:     "unknown plan value is not ignored",
+			config:   testObjectValue(ty, map[string]cty.Value{"string_property": str("new"), "int_property": cty.NumberIntVal(1)}),
+			plan:     testObjectValue(ty, map[string]cty.Value{"string_property": cty.UnknownVal(cty.String), "int_property": cty.NumberIntVal(1)}),
+			expected: nil,
+		},
+		{
+			name:     "null plan value is not ignored",
+			config:   testObjectValue(ty, map[string]cty.Value{"string_property": str("new"), "int_property": cty.NumberIntVal(1)}),
+			plan:     testObjectValue(ty, map[string]cty.Value{"int_property": cty.NumberIntVal(1)}),
+			expected: nil,
+		},
+		{
+			name:     "null raw config and raw plan (read operations, tests) yield nothing",
+			config:   cty.NullVal(ty),
+			plan:     cty.NullVal(ty),
+			expected: nil,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.expected, findIgnoredAttributePaths(tc.config, tc.plan, resourceSchema))
+		})
+	}
+}
+
+func TestOverlayRemoteValues(t *testing.T) {
+	nodeSizeProperty := newStringSchemaDefinitionPropertyWithDefaults("nodeSize", "", false, false, nil) // API name nodeSize, terraform name node_size
+	resourceSchema := newTestSchema(ignoreStringProperty, ignoreIntProperty, nodeSizeProperty).getSchemaDefinition()
+
+	t.Run("remote value replaces the payload value of the ignored attribute and nothing else", func(t *testing.T) {
+		payload := map[string]interface{}{"string_property": "fromConfig", "int_property": 11}
+		remote := map[string]interface{}{"string_property": "fromAPI", "int_property": float64(10)}
+		overlayRemoteValues(payload, remote, resourceSchema, []ignoredAttribute{{Path: []string{"string_property"}, PlanValue: "prior"}})
+		assert.Equal(t, map[string]interface{}{"string_property": "fromAPI", "int_property": 11}, payload)
+	})
+	t.Run("terraform attribute names are translated to API property names", func(t *testing.T) {
+		payload := map[string]interface{}{"nodeSize": "small"}
+		remote := map[string]interface{}{"nodeSize": "xlarge"}
+		overlayRemoteValues(payload, remote, resourceSchema, []ignoredAttribute{{Path: []string{"node_size"}, PlanValue: "prior"}})
+		assert.Equal(t, map[string]interface{}{"nodeSize": "xlarge"}, payload)
+	})
+	t.Run("missing remote value falls back to the plan value", func(t *testing.T) {
+		payload := map[string]interface{}{"string_property": "fromConfig"}
+		overlayRemoteValues(payload, map[string]interface{}{}, resourceSchema, []ignoredAttribute{{Path: []string{"string_property"}, PlanValue: "prior"}})
+		assert.Equal(t, map[string]interface{}{"string_property": "prior"}, payload)
+	})
+	t.Run("null remote value falls back to the plan value", func(t *testing.T) {
+		payload := map[string]interface{}{"string_property": "fromConfig"}
+		overlayRemoteValues(payload, map[string]interface{}{"string_property": nil}, resourceSchema, []ignoredAttribute{{Path: []string{"string_property"}, PlanValue: "prior"}})
+		assert.Equal(t, map[string]interface{}{"string_property": "prior"}, payload)
+	})
+	t.Run("an attribute missing from the payload is added with the remote value", func(t *testing.T) {
+		payload := map[string]interface{}{}
+		overlayRemoteValues(payload, map[string]interface{}{"string_property": "fromAPI"}, resourceSchema, []ignoredAttribute{{Path: []string{"string_property"}}})
+		assert.Equal(t, map[string]interface{}{"string_property": "fromAPI"}, payload)
+	})
+	t.Run("no ignored attributes leaves the payload untouched", func(t *testing.T) {
+		payload := map[string]interface{}{"string_property": "fromConfig"}
+		overlayRemoteValues(payload, map[string]interface{}{"string_property": "fromAPI"}, resourceSchema, nil)
+		assert.Equal(t, map[string]interface{}{"string_property": "fromConfig"}, payload)
+	})
+}
+
+// nested properties used by the ignore_changes (INS-45117) tests of objects and lists
+var ignoreNestedSchema = &SpecSchemaDefinition{Properties: SpecSchemaDefinitionProperties{
+	newStringSchemaDefinitionPropertyWithDefaults("field", "", false, false, nil),
+	newStringSchemaDefinitionPropertyWithDefaults("other", "", false, false, nil),
+	newStringSchemaDefinitionProperty("computed_field", "", false, false, true, false, false, false, false, false, nil),
+}}
+var ignoreObjectProperty = newObjectSchemaDefinitionPropertyWithDefaults("settings", "", false, false, false, nil, ignoreNestedSchema)
+var ignoreListOfObjectsProperty = newListSchemaDefinitionPropertyWithDefaults("items", "", false, false, false, nil, TypeObject, ignoreNestedSchema)
+var ignoreListOfStringsProperty = newListSchemaDefinitionPropertyWithDefaults("tags", "", false, false, false, nil, TypeString, nil)
+var ignoreUnorderedStringsProperty = func() *SpecSchemaDefinitionProperty {
+	p := newListSchemaDefinitionPropertyWithDefaults("unordered_tags", "", false, false, false, nil, TypeString, nil)
+	p.IgnoreItemsOrder = true
+	return p
+}()
+var ignoreUnorderedObjectsProperty = func() *SpecSchemaDefinitionProperty {
+	p := newListSchemaDefinitionPropertyWithDefaults("unordered_items", "", false, false, false, nil, TypeObject, ignoreNestedSchema)
+	p.IgnoreItemsOrder = true
+	return p
+}()
+
+func TestFindIgnoredAttributePathsNestedAndLists(t *testing.T) {
+	properties := []*SpecSchemaDefinitionProperty{ignoreStringProperty, ignoreObjectProperty, ignoreListOfObjectsProperty, ignoreListOfStringsProperty, ignoreUnorderedStringsProperty, ignoreUnorderedObjectsProperty}
+	ty := testImpliedType(t, properties...)
+	resourceSchema := newTestSchema(properties...).getSchemaDefinition()
+	str := cty.StringVal
+	objType := func(name string) cty.Type { return ty.AttributeType(name).ElementType() }
+	obj := func(name string, values map[string]cty.Value) cty.Value {
+		return testObjectValue(objType(name), values)
+	}
+	list := func(name string, elems ...cty.Value) cty.Value {
+		if len(elems) == 0 {
+			return cty.ListValEmpty(objType(name))
+		}
+		return cty.ListVal(elems)
+	}
+	strList := func(values ...string) cty.Value {
+		elems := []cty.Value{}
+		for _, v := range values {
+			elems = append(elems, str(v))
+		}
+		if len(elems) == 0 {
+			return cty.ListValEmpty(cty.String)
+		}
+		return cty.ListVal(elems)
+	}
+	base := func(values map[string]cty.Value) cty.Value {
+		values["string_property"] = str("a")
+		return testObjectValue(ty, values)
+	}
+
+	testCases := []struct {
+		name     string
+		config   cty.Value
+		plan     cty.Value
+		expected []ignoredAttribute
+	}{
+		{
+			name:     "nested object: ignored attribute inside the object, sibling in the same object also changed",
+			config:   base(map[string]cty.Value{"settings": list("settings", obj("settings", map[string]cty.Value{"field": str("new"), "other": str("newOther")}))}),
+			plan:     base(map[string]cty.Value{"settings": list("settings", obj("settings", map[string]cty.Value{"field": str("prior"), "other": str("newOther")}))}),
+			expected: []ignoredAttribute{{Path: []string{"settings", "0", "field"}, PlanValue: "prior"}},
+		},
+		{
+			name:     "nested object: nothing ignored when config and plan agree",
+			config:   base(map[string]cty.Value{"settings": list("settings", obj("settings", map[string]cty.Value{"field": str("x")}))}),
+			plan:     base(map[string]cty.Value{"settings": list("settings", obj("settings", map[string]cty.Value{"field": str("x")}))}),
+			expected: nil,
+		},
+		{
+			name:     "nested object omitted from the HCL but kept by the plan: the whole object is ignored",
+			config:   base(map[string]cty.Value{"settings": list("settings")}),
+			plan:     base(map[string]cty.Value{"settings": list("settings", obj("settings", map[string]cty.Value{"field": str("prior")}))}),
+			expected: []ignoredAttribute{{Path: []string{"settings"}}},
+		},
+		{
+			name: "list of objects with the same length: only the ignored attribute of the ignored item",
+			config: base(map[string]cty.Value{"items": list("items",
+				obj("items", map[string]cty.Value{"field": str("a")}),
+				obj("items", map[string]cty.Value{"field": str("new")}))}),
+			plan: base(map[string]cty.Value{"items": list("items",
+				obj("items", map[string]cty.Value{"field": str("a")}),
+				obj("items", map[string]cty.Value{"field": str("prior")}))}),
+			expected: []ignoredAttribute{{Path: []string{"items", "1", "field"}, PlanValue: "prior"}},
+		},
+		{
+			name: "list of objects with different lengths: the whole list is ignored",
+			config: base(map[string]cty.Value{"items": list("items",
+				obj("items", map[string]cty.Value{"field": str("a")}),
+				obj("items", map[string]cty.Value{"field": str("b")}))}),
+			plan:     base(map[string]cty.Value{"items": list("items", obj("items", map[string]cty.Value{"field": str("a")}))}),
+			expected: []ignoredAttribute{{Path: []string{"items"}}},
+		},
+		{
+			name:     "list of objects: computed attribute of an item that the config leaves null is not ignored (regression, commit 7471de73)",
+			config:   base(map[string]cty.Value{"items": list("items", obj("items", map[string]cty.Value{"field": str("a")}))}),
+			plan:     base(map[string]cty.Value{"items": list("items", obj("items", map[string]cty.Value{"field": str("a"), "computed_field": str("computedByAPI")}))}),
+			expected: nil,
+		},
+		{
+			name:     "list of primitives that differs: the whole list is ignored with the planned list as fallback",
+			config:   base(map[string]cty.Value{"tags": strList("a", "b")}),
+			plan:     base(map[string]cty.Value{"tags": strList("a")}),
+			expected: []ignoredAttribute{{Path: []string{"tags"}, PlanValue: []interface{}{"a"}}},
+		},
+		{
+			name:     "ignore order list of primitives with the same items in another order is not ignored",
+			config:   base(map[string]cty.Value{"unordered_tags": strList("b", "a")}),
+			plan:     base(map[string]cty.Value{"unordered_tags": strList("a", "b")}),
+			expected: nil,
+		},
+		{
+			name:     "ignore order list of primitives with different items: the whole list is ignored",
+			config:   base(map[string]cty.Value{"unordered_tags": strList("b", "c")}),
+			plan:     base(map[string]cty.Value{"unordered_tags": strList("a", "b")}),
+			expected: []ignoredAttribute{{Path: []string{"unordered_tags"}, PlanValue: []interface{}{"a", "b"}}},
+		},
+		{
+			name: "ignore order list of objects with the same length is not inspected per index (documented limitation)",
+			config: base(map[string]cty.Value{"unordered_items": list("unordered_items",
+				obj("unordered_items", map[string]cty.Value{"field": str("b")}))}),
+			plan: base(map[string]cty.Value{"unordered_items": list("unordered_items",
+				obj("unordered_items", map[string]cty.Value{"field": str("a")}))}),
+			expected: nil,
+		},
+		{
+			name: "ignore order list of objects with different lengths: the whole list is ignored",
+			config: base(map[string]cty.Value{"unordered_items": list("unordered_items",
+				obj("unordered_items", map[string]cty.Value{"field": str("a")}),
+				obj("unordered_items", map[string]cty.Value{"field": str("b")}))}),
+			plan: base(map[string]cty.Value{"unordered_items": list("unordered_items",
+				obj("unordered_items", map[string]cty.Value{"field": str("a")}))}),
+			expected: []ignoredAttribute{{Path: []string{"unordered_items"}}},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.expected, findIgnoredAttributePaths(tc.config, tc.plan, resourceSchema))
+		})
+	}
+}
+
+func TestOverlayRemoteValuesNestedAndLists(t *testing.T) {
+	resourceSchema := newTestSchema(ignoreStringProperty, ignoreObjectProperty, ignoreListOfObjectsProperty, ignoreListOfStringsProperty).getSchemaDefinition()
+
+	t.Run("nested object: only the ignored attribute is replaced, the terraform list index is not part of the payload", func(t *testing.T) {
+		payload := map[string]interface{}{"settings": map[string]interface{}{"field": "fromConfig", "other": "fromConfig"}}
+		remote := map[string]interface{}{"settings": map[string]interface{}{"field": "fromAPI", "other": "fromAPI"}}
+		overlayRemoteValues(payload, remote, resourceSchema, []ignoredAttribute{{Path: []string{"settings", "0", "field"}, PlanValue: "prior"}})
+		assert.Equal(t, map[string]interface{}{"settings": map[string]interface{}{"field": "fromAPI", "other": "fromConfig"}}, payload)
+	})
+	t.Run("nested object: missing remote object falls back to the plan value", func(t *testing.T) {
+		payload := map[string]interface{}{"settings": map[string]interface{}{"field": "fromConfig"}}
+		overlayRemoteValues(payload, map[string]interface{}{}, resourceSchema, []ignoredAttribute{{Path: []string{"settings", "0", "field"}, PlanValue: "prior"}})
+		assert.Equal(t, map[string]interface{}{"settings": map[string]interface{}{"field": "prior"}}, payload)
+	})
+	t.Run("list of objects: the attribute of the item at the index is replaced", func(t *testing.T) {
+		payload := map[string]interface{}{"items": []interface{}{
+			map[string]interface{}{"field": "a"},
+			map[string]interface{}{"field": "fromConfig"},
+		}}
+		remote := map[string]interface{}{"items": []interface{}{
+			map[string]interface{}{"field": "a"},
+			map[string]interface{}{"field": "fromAPI"},
+		}}
+		overlayRemoteValues(payload, remote, resourceSchema, []ignoredAttribute{{Path: []string{"items", "1", "field"}, PlanValue: "prior"}})
+		assert.Equal(t, "fromAPI", payload["items"].([]interface{})[1].(map[string]interface{})["field"])
+		assert.Equal(t, "a", payload["items"].([]interface{})[0].(map[string]interface{})["field"])
+	})
+	t.Run("list of objects: remote list shorter than the index falls back to the plan value", func(t *testing.T) {
+		payload := map[string]interface{}{"items": []interface{}{map[string]interface{}{"field": "fromConfig"}}}
+		remote := map[string]interface{}{"items": []interface{}{}}
+		overlayRemoteValues(payload, remote, resourceSchema, []ignoredAttribute{{Path: []string{"items", "0", "field"}, PlanValue: "prior"}})
+		assert.Equal(t, "prior", payload["items"].([]interface{})[0].(map[string]interface{})["field"])
+	})
+	t.Run("whole list: replaced by the remote list even when the sizes differ", func(t *testing.T) {
+		payload := map[string]interface{}{"items": []interface{}{map[string]interface{}{"field": "x"}, map[string]interface{}{"field": "y"}}}
+		remote := map[string]interface{}{"items": []interface{}{map[string]interface{}{"field": "a"}}}
+		overlayRemoteValues(payload, remote, resourceSchema, []ignoredAttribute{{Path: []string{"items"}}})
+		assert.Equal(t, remote["items"], payload["items"])
+	})
+	t.Run("whole list of primitives: remote missing falls back to the plan list", func(t *testing.T) {
+		payload := map[string]interface{}{"tags": []interface{}{"a", "b"}}
+		overlayRemoteValues(payload, map[string]interface{}{}, resourceSchema, []ignoredAttribute{{Path: []string{"tags"}, PlanValue: []interface{}{"a"}}})
+		assert.Equal(t, []interface{}{"a"}, payload["tags"])
+	})
 }

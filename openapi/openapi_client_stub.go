@@ -16,6 +16,11 @@ type clientOpenAPIStub struct {
 	parentIDsReceived   []string
 	telemetryHandler    TelemetryHandler
 
+	// recorded interactions, used by tests to assert what the provider sent and how many calls it made
+	putPayloadReceived interface{}
+	getCalls           int
+	putCalls           int
+
 	funcPut func() (*http.Response, error)
 }
 
@@ -34,6 +39,8 @@ func (c *clientOpenAPIStub) Post(resource SpecResource, requestPayload interface
 }
 
 func (c *clientOpenAPIStub) Put(resource SpecResource, id string, requestPayload interface{}, responsePayload interface{}, parentIDs ...string) (*http.Response, error) {
+	c.putCalls++
+	c.putPayloadReceived = requestPayload
 	if c.funcPut != nil {
 		return c.funcPut()
 	}
@@ -52,6 +59,7 @@ func (c *clientOpenAPIStub) Put(resource SpecResource, id string, requestPayload
 }
 
 func (c *clientOpenAPIStub) Get(resource SpecResource, id string, responsePayload interface{}, parentIDs ...string) (*http.Response, error) {
+	c.getCalls++
 	if c.error != nil {
 		return nil, c.error
 	}

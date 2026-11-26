@@ -2,7 +2,10 @@ package openapi
 
 import (
 	"encoding/json"
+	"github.com/hashicorp/go-cty/cty"
+	ctyjson "github.com/hashicorp/go-cty/cty/json"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/terraform"
 	"github.com/stretchr/testify/assert"
 	"io/ioutil"
 	"log"
@@ -189,4 +192,95 @@ func assertTerraformSchemaProperty(t *testing.T, actual *schema.Schema, expected
 		assert.False(t, actual.Required, msgAndArgs)
 	}
 	assert.Equal(t, expectedComputed, actual.Computed, msgAndArgs)
+}
+
+// newResourceDataWithRaw creates the ResourceData the resource factory's update function would receive from Terraform
+// during an apply: the given id and attributes are the prior/planned state, rawConfig is what GetRawConfig() returns
+// (the user's HCL) and rawPlan is what GetRawPlan() returns (where lifecycle ignore_changes has kept the prior value).
+// Raw values are given as plain maps keyed by Terraform attribute names; attributes left out become null.
+func newResourceDataWithRaw(t *testing.T, r resourceFactory, id string, attributes map[string]string, rawConfig, rawPlan map[string]interface{}) *schema.ResourceData {
+	res, err := r.createTerraformResource()
+	assert.NoError(t, err)
+	impliedType := schema.InternalMap(res.Schema).CoreConfigSchema().ImpliedType()
+	return res.Data(&terraform.InstanceState{
+		ID:         id,
+		Attributes: attributes,
+		RawConfig:  testCtyValue(t, impliedType, rawConfig),
+		RawPlan:    testCtyValue(t, impliedType, rawPlan),
+	})
+}
+
+func bigToInt(v cty.Value) int64 {
+	i, _ := v.AsBigFloat().Int64()
+	return i
+}
+
+// testCtyValue converts a plain map into a cty value of the given object type (attributes not present become null)
+func testCtyValue(t *testing.T, ty cty.Type, values map[string]interface{}) cty.Value {
+	b, err := json.Marshal(values)
+	assert.NoError(t, err)
+	v, err := ctyjson.Unmarshal(b, ty)
+	assert.NoError(t, err)
+	return v
+}
+
+// applyUpdateWithRaw runs the resource factory's update with the given raw config and raw plan against the client and
+// returns the error, so tests can assert on what the client received (see clientOpenAPIStub.putPayloadReceived, getCalls, putCalls)
+func applyUpdateWithRaw(t *testing.T, r resourceFactory, id string, attributes map[string]string, rawConfig, rawPlan map[string]interface{}, client ClientOpenAPI) error {
+	return r.update(newResourceDataWithRaw(t, r, id, attributes, rawConfig, rawPlan), client)
+}
+
+func TestApplyUpdateWithRawHelper(t *testing.T) {
+	// a read only identifier, like the id of real CMAPI resources, which is not part of the update payload nor the immutable check
+	readOnlyIDProperty := newStringSchemaDefinitionProperty("id", "", false, true, false, false, false, false, true, false, "id")
+	r, _ := testCreateResourceFactoryWithID(t, readOnlyIDProperty, stringProperty, intProperty)
+	attributes := map[string]string{"id": "id", "string_property": "priorValue", "int_property": "10"}
+	// the HCL asks for a new string_property but the plan kept the prior one, which is what ignore_changes does
+	rawConfig := map[string]interface{}{"string_property": "newValue", "int_property": 11}
+	rawPlan := map[string]interface{}{"string_property": "priorValue", "int_property": 11}
+
+	t.Run("ResourceData exposes the given raw config and raw plan", func(t *testing.T) {
+		data := newResourceDataWithRaw(t, r, "id", attributes, rawConfig, rawPlan)
+		assert.Equal(t, "newValue", data.GetRawConfig().GetAttr("string_property").AsString())
+		assert.Equal(t, "priorValue", data.GetRawPlan().GetAttr("string_property").AsString())
+		assert.Equal(t, int64(11), bigToInt(data.GetRawPlan().GetAttr("int_property")))
+	})
+
+	t.Run("update runs against the raw values and the stub records the calls", func(t *testing.T) {
+		client := &clientOpenAPIStub{responsePayload: map[string]interface{}{
+			readOnlyIDProperty.Name: "id", stringProperty.Name: "priorValue", intProperty.Name: float64(11),
+		}}
+		err := applyUpdateWithRaw(t, r, "id", attributes, rawConfig, rawPlan, client)
+		assert.NoError(t, err)
+		assert.Equal(t, 1, client.getCalls, "the remote object is read exactly once before the PUT")
+		assert.Equal(t, 1, client.putCalls)
+		// the plan kept priorValue (ignore_changes), so the API value is sent, not the HCL value newValue (INS-45117)
+		payload, ok := client.putPayloadReceived.(map[string]interface{})
+		if !assert.True(t, ok, "PUT payload received: %v (err=%v, gets=%d, puts=%d)", client.putPayloadReceived, err, client.getCalls, client.putCalls) {
+			return
+		}
+		assert.Equal(t, "priorValue", payload["string_property"])
+		assert.Equal(t, 11, payload["int_property"])
+	})
+}
+
+// testImpliedType returns the cty object type Terraform uses for a resource made of the given properties
+func testImpliedType(t *testing.T, properties ...*SpecSchemaDefinitionProperty) cty.Type {
+	r, _ := testCreateResourceFactory(t, properties...)
+	res, err := r.createTerraformResource()
+	assert.NoError(t, err)
+	return schema.InternalMap(res.Schema).CoreConfigSchema().ImpliedType()
+}
+
+// testObjectValue builds a cty object of the given type where every attribute is null except the given ones. Unlike
+// testCtyValue it allows unknown values (cty.UnknownVal)
+func testObjectValue(ty cty.Type, values map[string]cty.Value) cty.Value {
+	attributes := map[string]cty.Value{}
+	for name, attributeType := range ty.AttributeTypes() {
+		attributes[name] = cty.NullVal(attributeType)
+	}
+	for name, value := range values {
+		attributes[name] = value
+	}
+	return cty.ObjectVal(attributes)
 }
